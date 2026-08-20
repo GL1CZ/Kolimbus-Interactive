@@ -22,7 +22,6 @@
         font-family:Arial, sans-serif;
     }
 
-    /* Vnější neviditelný prostor */
     .game-wrapper{
         width:1100px;
         height:800px;
@@ -35,7 +34,6 @@
         align-items:center;
     }
 
-    /* Herní okno */
     #game{
         position:relative;
 
@@ -52,7 +50,6 @@
         background-position:center;
     }
 
-    /* Sluchátka */
     #headphones{
         position:absolute;
         width:150px;
@@ -62,19 +59,18 @@
         pointer-events:auto;
     }
 
-    /* Překážky */
     .junk{
         position:absolute;
         cursor:grab;
         user-select:none;
         max-width:none;
+        touch-action: none;
     }
 
     .junk:active{
         cursor:grabbing;
     }
 
-    /* Modální okno */
     #modal{
         position:fixed;
         inset:0;
@@ -116,27 +112,26 @@
         background:#125fe0;
     }
 
-    /* ---- INVENTÁŘ OPRAVENÝ PODLE VZORU HOTEL3-4.HTML ---- */
     #inventory {
         position: absolute;
-        top: 130px;                 /* Umístění 50px pod horní okraj */
+        top: 130px;
         left: 50%;
-        transform: translateX(-50%); /* Perfektní horizontální vycentrování */
-        background: rgba(20, 20, 20, 0.75); /* Tmavé poloprůhledné pozadí ze vzoru */
+        transform: translateX(-50%);
+        background: rgba(20, 20, 20, 0.75);
         border-radius: 8px;
         padding: 8px 15px;
-        display: flex;              /* Změněno z none na flex, protože už obsahuje výchozí předměty */
+        display: flex;
         gap: 12px;
-        z-index: 5000;             /* Bezpečně nad herními předměty */
+        z-index: 5000;
         box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        min-height: 66px;          /* Zajištění výšky i když je prázdný */
+        min-height: 66px;
         min-width: 100px;
         justify-content: center;
         align-items: center;
     }
 
     #inventory img {
-        width: 48px;               /* Velikost ikon přizpůsobená vzoru */
+        width: 48px;
         height: 48px;
         object-fit: contain;
         display: block;
@@ -153,11 +148,10 @@
         100%{ transform:scale(1) translateY(0);    opacity:1; }
     }
 
-    /* Hláška – obrázková, spodní část obrazovky */
     #message-overlay{
         position:absolute;
         width:auto;
-		inset:0;
+        inset:0;
         display:none;
         justify-content:center;
         align-items:flex-end;
@@ -176,7 +170,6 @@
         to  { opacity:1; transform:translateY(0); }
     }
 
-    /* Tlačítko Pokračovat */
     #continue-btn{
         position:absolute;
         bottom:130px;
@@ -209,30 +202,18 @@
 <body>
 
 <div class="game-wrapper">
-
     <div id="game">
-
         <div id="inventory">
-            <!-- Výchozí předměty v inventáři s navázaným popiskem -->
             <img src="groovie-icon.png" alt="Groovie" onclick="showItemText('groovie')">
             <img src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
             <img src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
         </div>
-
-        <img
-            id="headphones"
-            src="beats.png"
-            alt="Sluchátka"
-        >
-
+        <img id="headphones" src="beats.png" alt="Sluchátka">
         <div id="message-overlay">
             <img id="message-img" src="" alt="">
         </div>
-
         <button id="continue-btn">Pokračovat</button>
-
     </div>
-
 </div>
 
 <div id="modal" style="display:none!important">
@@ -250,34 +231,24 @@ const msgOverlay   = document.getElementById("message-overlay");
 const msgImg       = document.getElementById("message-img");
 const continueBtn  = document.getElementById("continue-btn");
 
-/* ---------- Přesměrování při kliknutí na tlačítko Pokračovat ---------- */
-continueBtn.addEventListener("click", () => {
-    window.location.href = "hotel3-4.html";
-});
-
-/* ---------- Globální proměnná pro hudbu na pozadí ---------- */
 let bgMusic = null;
 
-/* ---------- Zvuky ---------- */
 function playSound(src){
     const a = new Audio(src);
     a.play().catch(()=>{});
 }
 
-/* ---------- Spuštění hudby na pozadí ---------- */
 function startBackgroundMusic(src){
     if(!bgMusic){
         bgMusic = new Audio(src);
-        bgMusic.volume = 0.3; /* Volume: 30% */
-        bgMusic.loop = true;  /* Nekonečná smyčka */
+        bgMusic.volume = 0.3;
+        bgMusic.loop = true;
         bgMusic.play().catch(()=>{});
     }
 }
 
-/* ---------- Stav sebraných předmětů ---------- */
 const collected = { sponka: false, banknote: false, beats: false, blackmoon: false };
 
-/* ---------- Textové popisy předmětů vytažené ze souborů ---------- */
 const itemTexts = {
     'groovie': "Ashe zatím povolat nepotřebuju.",
     'autoplay': "Tohle si schovám až na velké finále.",
@@ -289,18 +260,15 @@ const itemTexts = {
     'maui': "Moje huňatá kulička. Když je napapaná. Jinak je to krvelačná bestie."
 };
 
-/* ---------- Zobrazení popisku předmětu ---------- */
 function showItemText(key) {
     if (itemTexts[key]) {
         alert(itemTexts[key]);
     }
 }
 
-/* ---------- Inventář – přidání ikonky ---------- */
 function addIcon(src, key){
     inventory.style.display = "flex";
-	
-	const ico = document.createElement("img");
+    const ico = document.createElement("img");
     ico.src = src;
     ico.alt = "";
     ico.onclick = () => showItemText(key);
@@ -308,7 +276,6 @@ function addIcon(src, key){
     playSound("icon-show.wav");
 }
 
-/* ---------- Hláška (obrázková, spodní část herního okna) ---------- */
 function showMessage(imgSrc, onClose){
     msgImg.src = imgSrc;
     msgOverlay.style.display = "flex";
@@ -321,7 +288,6 @@ function showMessage(imgSrc, onClose){
     msgOverlay.addEventListener("click", dismiss);
 }
 
-/* ---------- Kontrola dokončení (po sebrání všech 4 povinných předmětů) ---------- */
 function checkCompletion(){
     if(collected.sponka && collected.banknote && collected.beats && collected.blackmoon){
         showMessage("koment.png", ()=>{
@@ -329,8 +295,6 @@ function checkCompletion(){
                 playSound("meow.mp3");
                 addIcon("maui-icon.png", "maui");
                 continueBtn.style.display = "block";
-                
-                /* Vypnutí hudby v pozadí při zobrazení tlačítka */
                 if(bgMusic){
                     bgMusic.pause();
                 }
@@ -339,7 +303,6 @@ function checkCompletion(){
     }
 }
 
-/* ---------- Náhodná pozice sluchátek ---------- */
 headphones.addEventListener("load", placeHeadphones);
 if(headphones.complete) placeHeadphones();
 
@@ -355,7 +318,6 @@ function placeHeadphones(){
     headphones.style.top  = y + "px";
 }
 
-/* ---------- Klik na sluchátka (beats.png) ---------- */
 headphones.addEventListener("click", (e) => {
     if(collected.beats) return;
     e.stopPropagation();
@@ -368,30 +330,12 @@ headphones.addEventListener("click", (e) => {
     });
 });
 
-/* ---------- Překážky ---------- */
 const junkImages = [
-    "blok.png",
-    "mobil.png",
-    "mince.png",
-    "keanu.jpg",
-    "necro.png",
-    "voynich.jpg",
-    "evil.jpg",
-    "doom.jpg",
-    "map.jpg",
-    "znak.png",
-    "tacek.png",
-    "postava.jpg",
-    "hypnoza.jpg",
-    "bruce.jpg",
-    "bernau.png",
-    "sifra.png",
-    "blackmoon.png",
-    "500.png",
-    "sponka.png"
+    "blok.png", "mobil.png", "mince.png", "keanu.jpg", "necro.png", "voynich.jpg",
+    "evil.jpg", "doom.jpg", "map.jpg", "znak.png", "tacek.png", "postava.jpg",
+    "hypnoza.jpg", "bruce.jpg", "bernau.png", "sifra.png", "blackmoon.png", "500.png", "sponka.png"
 ];
 
-/* Speciální předměty – jejich chování při kliknutí */
 const specialItems = {
     "sponka.png": (img) => {
         if(collected.sponka) return;
@@ -420,7 +364,7 @@ const specialItems = {
         img.style.display = "none";
         showMessage("deska-text.png", ()=>{
             addIcon("deska-icon.png", "deska");
-            checkCompletion(); /* Kontrola dokončení po sebrání desky */
+            checkCompletion();
         });
     }
 };
@@ -430,14 +374,11 @@ junkImages.forEach((src) => {
     img.src = src;
     img.classList.add("junk");
     img.dataset.src = src;
-
     img.style.left = Math.random() * 760 + "px";
     img.style.top  = Math.random() * 460 + "px";
     img.style.zIndex = Math.floor(Math.random() * 100) + 2;
-
     const rot = Math.random() * 360;
     img.style.transform = `rotate(${rot}deg)`;
-
     game.appendChild(img);
 
     if(specialItems[src]){
@@ -451,108 +392,56 @@ junkImages.forEach((src) => {
     }
 });
 
-/* Zajištění překrytí sluchátek alespoň jedním obrázkem */
-const specialSrcs = Object.keys(specialItems);
-const allJunk = Array.from(document.querySelectorAll(".junk"))
-    .filter(img => !specialSrcs.includes(img.dataset.src));
-
-Promise.all(
-    allJunk.map(img =>
-        img.complete
-            ? Promise.resolve()
-            : new Promise(res => { img.onload = res; img.onerror = res; })
-    )
-).then(() => {
-    const hx = parseFloat(headphones.style.left);
-    const hy = parseFloat(headphones.style.top);
-    const hw = headphones.offsetWidth;
-    const hh = headphones.offsetHeight;
-
-    const hcx = hx + hw / 2;
-    const hcy = hy + hh / 2;
-
-    const hpZ = parseInt(headphones.style.zIndex) || 1;
-
-    const alreadyCovered = allJunk.some(img => {
-        if ((parseInt(img.style.zIndex) || 0) <= hpZ) return false;
-        const ix = parseFloat(img.style.left);
-        const iy = parseFloat(img.style.top);
-        const iw = img.offsetWidth;
-        const ih = img.offsetHeight;
-        return hcx >= ix && hcx <= ix + iw &&
-               hcy >= iy && hcy <= iy + ih;
-    });
-
-    if (!alreadyCovered) {
-        const cover = allJunk[Math.floor(Math.random() * allJunk.length)];
-        const cw = cover.offsetWidth  || 100;
-        const ch = cover.offsetHeight || 100;
-
-        const offsetRange = 30;
-        const cx = hcx - cw / 2 + (Math.random() * offsetRange * 2 - offsetRange);
-        const cy = hcy - ch / 2 + (Math.random() * offsetRange * 2 - offsetRange);
-
-        cover.style.left    = cx + "px";
-        cover.style.top     = cy + "px";
-        cover.style.zIndex  = hpZ + 10;   
-    }
-
-    /* Úvodní dialog a spuštění hudby v pozadí */
-    showMessage("uvod-text.png", () => {
-        startBackgroundMusic("searching.mp3");
-    });
-});
-
-/* Drag systém */
 function makeDraggable(element){
-
     let dragging = false;
 
-    element.addEventListener("click", (e) => {
-
+    function startDrag(e) {
         dragging = !dragging;
-
         if(dragging){
-            element.style.zIndex = parseInt(element.style.zIndex) + 1000;
+            element.style.zIndex = parseInt(element.style.zIndex || 0) + 1000;
         }
-
         e.stopPropagation();
-    });
+    }
 
-    document.addEventListener("mousemove", (e) => {
-
+    function moveDrag(e) {
         if(!dragging) return;
-
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
         const gameRect = game.getBoundingClientRect();
-
         const elemWidth  = element.offsetWidth;
         const elemHeight = element.offsetHeight;
 
-        let x = e.clientX - gameRect.left - elemWidth  / 2;
-        let y = e.clientY - gameRect.top  - elemHeight / 2;
+        let x = clientX - gameRect.left - elemWidth  / 2;
+        let y = clientY - gameRect.top  - elemHeight / 2;
 
         const visibleMargin = 40;
         const dragPadding   = 120;
-
         const minX = -elemWidth  + visibleMargin;
         const minY = -elemHeight + visibleMargin;
-
         const maxX = game.clientWidth  + dragPadding - elemWidth  + visibleMargin;
         const maxY = game.clientHeight + dragPadding - elemHeight + visibleMargin;
 
-        x = Math.max(minX, Math.min(x, maxX));
-        y = Math.max(minY, Math.min(y, maxY));
+        element.style.left = Math.max(minX, Math.min(x, maxX)) + "px";
+        element.style.top  = Math.max(minY, Math.min(y, maxY)) + "px";
+    }
 
-        element.style.left = x + "px";
-        element.style.top  = y + "px";
-    });
+    element.addEventListener("click", startDrag);
+    element.addEventListener("touchstart", (e) => {
+        startDrag(e);
+        e.preventDefault();
+    }, {passive: false});
 
-    document.addEventListener("click", (e) => {
-        if(e.target !== element){
-            dragging = false;
-        }
-    });
+    document.addEventListener("mousemove", moveDrag);
+    document.addEventListener("touchmove", moveDrag, {passive: false});
+
+    document.addEventListener("click", (e) => { if(e.target !== element) dragging = false; });
+    document.addEventListener("touchstart", (e) => { if(e.target !== element) dragging = false; });
 }
+
+showMessage("uvod-text.png", () => {
+    startBackgroundMusic("searching.mp3");
+});
 </script>
 
 </body>

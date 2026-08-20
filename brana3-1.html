@@ -139,6 +139,7 @@
     width: 320px; height: 320px;
     cursor: url('tuzka.png'), auto;
     z-index: 1;
+    touch-action: none;
   }
 
   .secret-text {
@@ -239,7 +240,7 @@
       </div>
     </div>
 
-    <button id="btn-pokracovat" onclick="window.location.href='zahrada3-2a.html'">Pokračovat</button>
+    <button id="btn-pokracovat" onclick="alert('Pokračování do dalšího panelu komiksu!')">Pokračovat</button>
 
   </div>
 </div>
@@ -508,6 +509,15 @@ function getMousePos(e) {
   };
 }
 
+function getTouchPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top
+  };
+}
+
 canvas.addEventListener('mousedown', (e) => {
   if (phase !== "minigame" || e.button !== 0) return; 
   isDrawing = true;
@@ -529,6 +539,32 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => { isDrawing = false; });
+
+/* --- PŘIDANÉ DOTYKOVÉ UDÁLOSTI PRO MOBIL --- */
+canvas.addEventListener('touchstart', (e) => {
+  if (phase !== "minigame") return;
+  isDrawing = true;
+  const pos = getTouchPos(e);
+  lastX = pos.x; lastY = pos.y;
+  e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (!isDrawing || phase !== "minigame") return;
+  const pos = getTouchPos(e);
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.stroke();
+
+  lastX = pos.x; lastY = pos.y;
+  checkTextCoverage();
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('touchend', () => { isDrawing = false; });
+window.addEventListener('touchcancel', () => { isDrawing = false; });
 
 function checkTextCoverage() {
   if (textPixels.length === 0) return;

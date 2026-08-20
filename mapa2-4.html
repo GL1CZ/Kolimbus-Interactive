@@ -48,7 +48,6 @@
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            /* padding-bottom: 20px; */
             box-sizing: border-box;
             cursor: auto;
         }
@@ -118,7 +117,6 @@
             pointer-events: none;
             transform: translate(-50%, -50%);
             z-index: 4;
-            /* Pozicování v lokálních souřadnicích kontejneru */
             left: var(--lx, -200%);
             top: var(--ly, -200%);
             box-sizing: border-box;
@@ -174,7 +172,6 @@
             margin-top: 0;
         }
 
-        /* Styl pro OK tlačítko v modalu */
         #success-box button {
             background: #ffcc00;
             color: #111;
@@ -189,7 +186,6 @@
         }
         #success-box button:hover { background: #ffee55; }
 
-        /* ---- TLAČÍTKO POKRAČOVAT (Závěr scény) ---- */
         #btn-final-continue {
             display: none;
             position: absolute;
@@ -263,31 +259,25 @@
     const flashlightUI  = document.getElementById('flashlight-ui');
     const btnContinue   = document.getElementById('btn-final-continue');
 
-    // --- ZVUKOVÉ AUDIO AUDIO PRVKY ---
     const soundSearching = new Audio('searching.wav');
-    soundSearching.loop = true; // Nastavení nekonečné smyčky
-	soundSearching.volume = 0.7;
+    soundSearching.loop = true;
+    soundSearching.volume = 0.7;
     
     const soundFound = new Audio('found.wav');
-	
-	const hura = new Audio('yes.wav');
-	hura.volume = 0.8;
-	
-	const pop = new Audio('Nafukovacka2.wav');
-	pop.volume = 0.8;
-	
-	const fail = new Audio('Fail2.wav');
-	fail.volume = 0.8;
+    const hura = new Audio('yes.wav');
+    hura.volume = 0.8;
+    const pop = new Audio('Nafukovacka2.wav');
+    pop.volume = 0.8;
+    const fail = new Audio('Fail2.wav');
+    fail.volume = 0.8;
 
     let gameActive = false;
     let lockedOn   = false;
-    let introPhase = 1; // 1 = Kolimbus1.png, 2 = Kolimbus1-1.png
+    let introPhase = 1;
 
-    // Lokální souřadnice myši uvnitř #game-container
     let localX = -200;
     let localY = -200;
 
-    // --- PŘEPOČET SOUŘADNIC MYŠI NA LOKÁLNÍ ---
     function updateLocalCoords(e) {
         const rect = gameContainer.getBoundingClientRect();
         localX = e.clientX - rect.left;
@@ -299,19 +289,16 @@
         gameContainer.style.setProperty('--ly', y + 'px');
     }
 
-    // --- INTRO KLIKÁNÍ ---
     kolimbusImg.addEventListener('click', () => {
         if (introPhase === 1) {
             kolimbusImg.src = 'Kolimbus1-1.png';
             introPhase = 2;
         } else if (introPhase === 2) {
             introLayer.style.display = 'none';
-            // Zapnout herní kurzor (none) a zobrazit herní prvky
             gameContainer.classList.add('game-mode');
             maskOverlay.style.display = 'block';
             flashlightUI.style.display = 'block';
             
-            // SPUŠTĚNÍ ZVUKU: Uživatelské kliknutí splňuje podmínku prohlížeče pro autoplay audio
             soundSearching.currentTime = 0;
             soundSearching.play().catch(err => console.log("Audio play failed:", err));
             
@@ -328,35 +315,58 @@
         }
 
         if (gameActive && !lockedOn) {
-            // Střed tečky v souřadnicích okna
             const carRect = car.getBoundingClientRect();
             const carX = carRect.left + carRect.width  / 2;
             const carY = carRect.top  + carRect.height / 2;
 
-            // Myš v souřadnicích okna
             const dist = Math.hypot(e.clientX - carX, e.clientY - carY);
 
-            // Poloměr červeného kruhu = --detect-size / 2 = 25px
             if (dist < 25) {
                 lockOnTarget();
             }
         }
     });
 
+    // --- POHYB NA MOBILU (TOUCH UDÁLOSTI) ---
+    function handleTouchMove(e) {
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            updateLocalCoords(touch);
+
+            if (!lockedOn) {
+                applyFlashlightPosition(localX, localY);
+            }
+
+            if (gameActive && !lockedOn) {
+                const carRect = car.getBoundingClientRect();
+                const carX = carRect.left + carRect.width  / 2;
+                const carY = carRect.top  + carRect.height / 2;
+
+                const dist = Math.hypot(touch.clientX - carX, touch.clientY - carY);
+
+                if (dist < 25) {
+                    lockOnTarget();
+                }
+            }
+        }
+    }
+
+    window.addEventListener('touchstart', handleTouchMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
     async function startGame() {
         gameActive = true;
         lockedOn   = false;
-		
-		animateFlashlightGrow(5, 75, 3000);
-		pop.play();
+        
+        animateFlashlightGrow(5, 75, 3000);
+        pop.play();
 
         statusText.innerText = 'HLEDÁM...';
         modal.style.display  = 'none';
         car.style.display    = 'block';
-        btnContinue.style.display = 'none'; // Skrýt při startu nové hry
+        btnContinue.style.display = 'none';
 
         const routes = [
-            // ČERVENÁ
             [
                 { x: 604, y: 110 },
                 { x: 585, y: 90  },
@@ -367,7 +377,6 @@
                 { x: 220, y: 606 },
                 { x: 450, y: 695 }
             ],
-            // MODRÁ
             [
                 { x: 604, y: 110 },
                 { x: 777, y: 105 },
@@ -379,7 +388,6 @@
                 { x: 539, y: 733 },
                 { x: 450, y: 695 }
             ],
-            // ZELENÁ
             [
                 { x: 604, y: 110 },
                 { x: 608, y: 133 },
@@ -427,14 +435,14 @@
             statusText.innerText = 'CÍL NALEZEN';
             modal.style.display  = 'flex';
             soundSearching.pause();
-			hura.play();
-			gameActive = false;
+            hura.play();
+            gameActive = false;
             return;
         }
 
         if (gameActive) {
             statusText.innerText = 'UTEKL MI!';
-			fail.play();
+            fail.play();
             resetGame();
         }
     }
@@ -443,9 +451,7 @@
         lockedOn = true;
         statusText.innerText = 'SLEDUJI CÍL...';
         
-        // ZASTAVENÍ VYHLEDÁVACÍHO ZVUKU A SPUŠTĚNÍ ZVUKU "NAVRACENO / FOUND"
-        //soundSearching.pause();
-		soundSearching.volume = 0.2;
+        soundSearching.volume = 0.2;
         soundFound.currentTime = 0;
         soundFound.play().catch(err => console.log("Audio play failed:", err));
 
@@ -475,7 +481,6 @@
         gameActive = false;
         lockedOn   = false;
 
-        // Vypnutí zvuků při resetu (pokud by ještě hrály)
         soundSearching.pause();
         soundFound.pause();
 
@@ -490,10 +495,9 @@
         statusText.innerText = '';
     }
 
-    // --- POTVRZENÍ MODALU ---
     function confirmSuccess() {
         modal.style.display = 'none';
-        btnContinue.style.display = 'block'; // Zobrazí pulzující tlačítko
+        btnContinue.style.display = 'block';
     }
 
     function pxToPercentX(px) { return (px / MAP_WIDTH)  * 100; }

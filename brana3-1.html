@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Brána</title>
+<style>
+  /* ====================================================================
+     KOLIMBUS - PANEL "BRÁNA" (FINÁLNÍ VERZE S AUDIO PAUZOU)
+     ==================================================================== */
+
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Caveat:wght=700&display=swap');
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    background: #111;
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #scene-wrapper {
+    position: relative;
+    width: 900px;
+    height: 768px;
+    transform: scale(var(--mb-scale, 1));
+    transform-origin: top center;
+  }
+
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('Brana-bkg.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  .game-asset {
+    position: absolute;
+    display: block;
+    user-select: none;
+  }
+
+  /* Pozicování prvků */
+  #img-tuzka { left: 129px; top: 649px; z-index: 10; cursor: pointer; }
+  #img-intercom { left: 253px; top: 419px; z-index: 15; cursor: pointer; }
+  #img-papirek { left: 633px; top: 617px; z-index: 12; cursor: pointer; }
+  #img-kolimbus { left: 444px; top: 380px; z-index: 14; pointer-events: none; }
+  #img-listy { left: 14px; top: 222px; z-index: 11; pointer-events: none; }
+  
+  #img-kostra { left: 444px; top: 380px; z-index: 14; display: none; pointer-events: none; }
+  #img-blesk1 { left: 277px; top: 406px; z-index: 20; display: none; pointer-events: none; }
+  #img-blesk2 { left: 275px; top: 378px; z-index: 20; display: none; pointer-events: none; }
+
+  #img-bublina-brn { 
+    left: 36px; top: 38px; z-index: 30; 
+    opacity: 0; 
+    transition: opacity 1.5s ease-in-out;
+    pointer-events: none;
+  }
+
+  .bubble-text {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 100;
+    transition: transform 0.1s;
+  }
+  .bubble-text:hover {
+    transform: scale(1.02);
+  }
+
+  /* INVENTÁŘ */
+  #inventory {
+    position: absolute;
+    top: 15px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .inv-item {
+    width: 48px; height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  /* MINIHRY */
+  #modal-password-game {
+    position: absolute;
+    display: none;
+    left: 50%; top: 50%;
+    width: 400px; height: 400px;
+    transform: translate(-50%, -50%);
+    background-color: #888888;
+    border-radius: 10px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    z-index: 400;
+    user-select: none;
+    justify-content: center;
+    align-items: center;
+  }
+  #modal-password-game.visible {
+    display: flex;
+  }
+
+  #minigame-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+  }
+
+  #paintCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 320px; height: 320px;
+    cursor: url('tuzka.png'), auto;
+    z-index: 1;
+  }
+
+  .secret-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-family: 'Caveat', cursive;
+    font-size: 38px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    z-index: 2;
+    pointer-events: none;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  #btn-pokracovat {
+    position: absolute;
+    right: 40px; bottom: 40px;
+    display: none;
+    z-index: 300;
+    padding: 15px 40px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #111;
+    background: #00cc44;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    animation: pulse-continue 1.4s infinite ease-in-out;
+  }
+
+  @keyframes pulse-continue {
+    0%   { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50%  { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  @media (max-width: 920px) {
+    body { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-wrapper">
+  <div id="game-container">
+
+    <!-- Scéna -->
+    <img id="img-tuzka" class="game-asset" src="tuzka.png" alt="Tužka" onclick="clickTuzka(event)">
+    <img id="img-intercom" class="game-asset" src="intercom.png" alt="Intercom" onclick="clickIntercom()">
+    <img id="img-papirek" class="game-asset" src="papirek.png" alt="Papírek" onclick="clickPapirek(event)">
+    <img id="img-kolimbus" class="game-asset" src="Kolimbus-brn.png" alt="Kolimbus">
+    <img id="img-listy" class="game-asset" src="listy.png" alt="Listy">
+    
+    <!-- Trest / Efekty -->
+    <img id="img-kostra" class="game-asset" src="kostra-brn.png" alt="Kostra">
+    <img id="img-blesk1" class="game-asset" src="blesk1.png" alt="Blesk 1">
+    <img id="img-blesk2" class="game-asset" src="blesk2.png" alt="Blesk 2">
+    <img id="img-bublina-brn" class="game-asset" src="bublina-brn.png" alt="Bublina">
+
+    <!-- Bubliny a texty -->
+    <img id="brana-text1" class="bubble-text" style="left: 252px; top: 162px;" src="brana-text1.png" alt="Text 1" onclick="closeText1()">
+    <img id="brana-text2" class="bubble-text" style="left: 273px; top: 236px;" src="brana-text2.png" alt="Text 2" onclick="closeText2()">
+    <img id="brana-text3" class="bubble-text" style="left: 232px; top: 249px;" src="brana-text3.png" alt="Text 3" onclick="closeBubble('brana-text3')">
+    
+    <!-- Intercom set -->
+    <img id="brana-text4" class="bubble-text" style="left: 265px; top: 254px;" src="brana-text4.png" alt="Text 4" onclick="closeIntercomBubble('brana-text4', 'brana-text5')">
+    <img id="brana-text5" class="bubble-text" style="left: 99px; top: 293px;" src="brana-text5.png" alt="Text 5" onclick="closeIntercomBubble('brana-text5', 'brana-text6')">
+    <img id="brana-text6" class="bubble-text" style="left: 215px; top: 230px;" src="brana-text6.png" alt="Text 6" onclick="closeIntercomBubble('brana-text6', 'brana-text7')">
+    <img id="brana-text7" class="bubble-text" style="left: 81px; top: 248px;" src="brana-text7.png" alt="Text 7" onclick="closeBubble('brana-text7')">
+    <img id="brana-text8" class="bubble-text" style="left: 72px; top: 241px;" src="brana-text8.png" alt="Text 8" onclick="closeText8()">
+
+    <!-- Závěr -->
+    <img id="brana-text9" class="bubble-text" style="left: 224px; top: 249px;" src="brana-text9.png" alt="Text 9" onclick="closeText9()">
+    <img id="brana-text10" class="bubble-text" style="left: 88px; top: 181px;" src="brana-text10.png" alt="Text 10" onclick="closeText10()">
+
+    <!-- INVENTÁŘ -->
+    <div id="inventory">
+      <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+      <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+      <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+      <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+      <img class="inv-item" src="flipper-icon.png" alt="Flipper" onclick="showItemText('flipper')">
+    </div>
+
+    <!-- MODÁLNÍ OKNO MINIHRY -->
+    <div id="modal-password-game">
+      <div id="minigame-container">
+        <canvas id="paintCanvas" width="320" height="320"></canvas>
+        <div class="secret-text" id="gameText">BIGGUS<br>DICUS</div>
+      </div>
+    </div>
+
+    <button id="btn-pokracovat" onclick="window.location.href='zahrada3-2a.html'">Pokračovat</button>
+
+  </div>
+</div>
+
+<!-- Pomocný modál pro inventář -->
+<div id="modal-item-text" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #00cc44; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4; color:#fff;"></p>
+    <button onclick="closeItemModal()" style="background:#00cc44; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<!-- Audio set -->
+<audio id="sound-ambient" src="ambiant.mp3"></audio>
+<audio id="sound-harp" src="harp.mp3"></audio>
+<audio id="sound-zap" src="electric-zap.mp3"></audio>
+<audio id="sound-gate" src="gate-open.mp3"></audio>
+<audio id="sound-aha" src="aha.mp3"></audio>
+
+<script>
+/* ==========================================================================
+   HLAVNÍ LOGIKA INTERAKTIVNÍHO PANELU "KOLIMBUS - BRÁNA"
+   ========================================================================== */
+
+function updateMobileScale() {
+  const SCENE_WIDTH = 900;
+  const viewportWidth = window.innerWidth;
+  let scale = 1;
+  if (viewportWidth < SCENE_WIDTH) {
+    scale = viewportWidth / SCENE_WIDTH;
+  }
+  document.documentElement.style.setProperty('--mb-scale', scale);
+  const wrapper = document.getElementById('scene-wrapper');
+  if(wrapper) {
+    wrapper.style.marginBottom = (768 * scale - 768) + 'px';
+  }
+}
+window.addEventListener('resize', updateMobileScale);
+window.addEventListener('DOMContentLoaded', updateMobileScale);
+
+let phase = "setup"; 
+let tuzkaCursorActive = false; 
+let intercomClicks = 0; 
+let text8Seen = false; 
+let punishmentActive = false;
+
+function initAmbientSound() {
+  const ambient = document.getElementById('sound-ambient');
+  if (ambient) {
+    ambient.volume = 0.4; 
+    ambient.loop = true;
+    ambient.play().catch(e => console.log("Ambient čeká na interakci."));
+  }
+}
+
+window.addEventListener('load', () => {
+  document.getElementById('game-container').addEventListener('click', function initAudioOnFirstClick() {
+    initAmbientSound();
+    document.getElementById('game-container').removeEventListener('click', initAudioOnFirstClick);
+  });
+
+  const bublina = document.getElementById('img-bublina-brn');
+  setTimeout(() => {
+    bublina.style.opacity = "1";
+  }, 300);
+
+  bublina.addEventListener('transitionend', function handleOpacityEnd() {
+    if (bublina.style.opacity === "1") {
+      const harp = document.getElementById('sound-harp');
+      harp.volume = 0.3;
+      harp.play().catch(e => console.log(e));
+      
+      bublina.style.opacity = "0";
+      
+      setTimeout(() => {
+        document.getElementById('brana-text1').style.display = 'block';
+      }, 1500);
+      
+      bublina.removeEventListener('transitionend', handleOpacityEnd);
+    }
+  });
+});
+
+function closeText1() {
+  document.getElementById('brana-text1').style.display = 'none';
+  phase = "exploration";
+}
+
+/* --- FÁZE: NALEZENÍ TUŽKY A PAPÍRKU --- */
+
+function clickTuzka(event) {
+  if (phase !== "exploration" && phase !== "punishment") return;
+  event.stopPropagation(); 
+
+  document.getElementById('brana-text2').style.display = 'block';
+}
+
+function closeText2() {
+  document.getElementById('brana-text2').style.display = 'none';
+  document.getElementById('img-tuzka').style.display = 'none';
+
+  document.getElementById('game-container').style.cursor = "url('tuzka.png'), auto";
+  tuzkaCursorActive = true;
+  
+  setTimeout(() => {
+    window.addEventListener('click', resetTuzkaCursor);
+  }, 50);
+}
+
+function resetTuzkaCursor() {
+  if (tuzkaCursorActive) {
+    document.getElementById('game-container').style.cursor = "default";
+    tuzkaCursorActive = false;
+    document.getElementById('img-tuzka').style.display = 'block';
+    window.removeEventListener('click', resetTuzkaCursor);
+  }
+}
+
+function clickPapirek(event) {
+  if (phase !== "exploration" && phase !== "punishment") return;
+
+  if (tuzkaCursorActive) {
+    event.stopPropagation();
+    window.removeEventListener('click', resetTuzkaCursor);
+    document.getElementById('game-container').style.cursor = "default";
+    tuzkaCursorActive = false;
+    startPasswordMinigame();
+  } else {
+    document.getElementById('brana-text3').style.display = 'block';
+  }
+}
+
+function clickIntercom() {
+  if (phase !== "exploration" && phase !== "punishment") return;
+  
+  if (text8Seen) {
+    triggerPunishment();
+    return;
+  }
+
+  intercomClicks++;
+  
+  if (intercomClicks === 1) {
+    document.getElementById('brana-text4').style.display = 'block';
+  } else if (intercomClicks === 2) {
+    document.getElementById('brana-text8').style.display = 'block';
+  }
+}
+
+function closeIntercomBubble(currentId, nextId) {
+  document.getElementById(currentId).style.display = 'none';
+  document.getElementById(nextId).style.display = 'block';
+}
+
+function closeBubble(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function closeText8() {
+  document.getElementById('brana-text8').style.display = 'none';
+  text8Seen = true;
+  phase = "punishment";
+  triggerPunishment();
+}
+
+/* --- FÁZE: HESLO A TREST --- */
+
+function triggerPunishment() {
+  if (punishmentActive) return;
+  punishmentActive = true;
+  
+  const zap = document.getElementById('sound-zap');
+  zap.volume = 0.3;
+  zap.play().catch(e => console.log(e));
+
+  const kolimbus = document.getElementById('img-kolimbus');
+  const kostra = document.getElementById('img-kostra');
+  const blesk1 = document.getElementById('img-blesk1');
+  const blesk2 = document.getElementById('img-blesk2');
+
+  let duration = 2000; 
+  let intervalTime = 150;
+  let elapsed = 0;
+
+  let blinkInterval = setInterval(() => {
+    elapsed += intervalTime;
+    if (elapsed >= duration) {
+      clearInterval(blinkInterval);
+      blesk1.style.display = 'none';
+      blesk2.style.display = 'none';
+      kostra.style.display = 'none';
+      kolimbus.style.left = '440px'; 
+      kolimbus.style.top = '380px';
+      kolimbus.style.display = 'block';
+      punishmentActive = false;
+    } else {
+      if (kolimbus.style.display !== 'none') {
+        kolimbus.style.display = 'none';
+        blesk1.style.display = 'none';
+        kostra.style.display = 'block';
+        blesk2.style.display = 'block';
+      } else {
+        kostra.style.display = 'none';
+        blesk2.style.display = 'none';
+        kolimbus.style.left = '444px';
+        kolimbus.style.top = '380px';
+        kolimbus.style.display = 'block';
+        blesk1.style.display = 'block';
+      }
+    }
+  }, intervalTime);
+}
+
+/* --- MINIHRA --- */
+
+const canvas = document.getElementById('paintCanvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let textPixels = [];
+
+function startPasswordMinigame() {
+  phase = "minigame";
+  document.getElementById('modal-password-game').classList.add('visible');
+  
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.lineWidth = 24; 
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#000000';
+
+  const offscreenCanvas = document.createElement('canvas');
+  offscreenCanvas.width = canvas.width;
+  offscreenCanvas.height = canvas.height;
+  const oCtx = offscreenCanvas.getContext('2d');
+
+  oCtx.fillStyle = '#ffffff';
+  oCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+  oCtx.font = "bold 38px 'Caveat'";
+  oCtx.fillStyle = '#000000';
+  oCtx.textAlign = "center";
+  oCtx.textBaseline = "middle";
+  
+  oCtx.fillText("PIUS", offscreenCanvas.width / 2, offscreenCanvas.height / 2 - 45);
+  oCtx.fillText("DICUS", offscreenCanvas.width / 2, offscreenCanvas.height / 2);
+  oCtx.fillText("MAGNUS", offscreenCanvas.width / 2, offscreenCanvas.height / 2 + 45);
+
+  const imgData = oCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+  const data = imgData.data;
+
+  textPixels = [];
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] === 0 && data[i+1] === 0 && data[i+2] === 0) {
+      textPixels.push(i);
+    }
+  }
+}
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  if (phase !== "minigame" || e.button !== 0) return; 
+  isDrawing = true;
+  const pos = getMousePos(e);
+  lastX = pos.x; lastY = pos.y;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!isDrawing || phase !== "minigame") return;
+  const pos = getMousePos(e);
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.stroke();
+
+  lastX = pos.x; lastY = pos.y;
+  checkTextCoverage();
+});
+
+window.addEventListener('mouseup', () => { isDrawing = false; });
+
+function checkTextCoverage() {
+  if (textPixels.length === 0) return;
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  let blackUnderText = 0;
+
+  for (let i = 0; i < textPixels.length; i++) {
+    const pixelIndex = textPixels[i];
+    if (data[pixelIndex] === 0 && data[pixelIndex+1] === 0 && data[pixelIndex+2] === 0) {
+      blackUnderText++;
+    }
+  }
+
+  const percentage = (blackUnderText / textPixels.length) * 100;
+
+  if (percentage > 85) {
+    isDrawing = false;
+    handlePasswordRevealed();
+  }
+}
+
+function handlePasswordRevealed() {
+  phase = "revealed_pause"; 
+
+  const soundAha = document.getElementById('sound-aha');
+  if (soundAha) {
+    soundAha.volume = 0.3;
+    soundAha.play().catch(e => console.log("Audio aha.mp3 nebylo možné přehrát:", e));
+  }
+
+  setTimeout(() => {
+    document.getElementById('modal-password-game').classList.remove('visible');
+    triggerConclusion();
+  }, 1200);
+}
+
+/* --- FÁZE: ZÁVĚR --- */
+
+function triggerConclusion() {
+  phase = "conclusion";
+  document.getElementById('brana-text9').style.display = 'block';
+}
+
+function closeText9() {
+  document.getElementById('brana-text9').style.display = 'none';
+  document.getElementById('brana-text10').style.display = 'block';
+  
+  const gate = document.getElementById('sound-gate');
+  gate.volume = 0.3;
+  gate.play().catch(e => console.log(e));
+}
+
+function closeText10() {
+  document.getElementById('brana-text10').style.display = 'none';
+  document.getElementById('btn-pokracovat').style.display = 'block';
+}
+
+/* --- INVENTÁŘ DATA --- */
+const itemTexts = {
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+  'flipper': "Malá krabička umožňující ovládat různá zařízení z dálky."
+};
+
+function showItemText(key) {
+  document.getElementById('item-description-text').innerText = itemTexts[key] || '';
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

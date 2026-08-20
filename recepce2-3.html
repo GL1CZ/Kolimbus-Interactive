@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Recepce</title>
+<style>
+  /* ====================================================================
+     KOLIMBUS - PANEL "RECEPCE"
+     ====================================================================
+     Panel navazuje na předchozí scény a obsahuje:
+       1) Sestavení scény
+       2) Úvodní rozhovor
+       3) Úplatek
+       4) Kniha hostů
+       5) Teleport
+
+     Rozlišení panelu: 900x768px (pevné souřadnice scény).
+     Na mobilu (portrait) se celý #game-container zmenší pomocí CSS
+     transform: scale(), aby se vlezl na šířku displeje - SOUŘADNICE
+     PRVKŮ UVNITŘ SCÉNY SE PŘITOM NEMĚNÍ, scaluje se celý kontejner.
+     ==================================================================== */
+
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    background: #111;
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  /* ---- WRAPPER PRO MOBILNÍ SCALE ----
+     Na desktopu se nic neděje (scale 1). Na mobilu JS spočítá scale faktor
+     tak, aby šířka 900px sedla na šířku displeje, a nastaví ho jako
+     CSS proměnnou --mb-scale na tomto wrapperu. Díky transform-origin
+     top center se kontejner zmenší a zarovná nahoru, beze změny
+     souřadnic prvků uvnitř (ty zůstávají v "logických" 900x768px). */
+  #scene-wrapper {
+    position: relative;
+    width: 900px;
+    height: 768px;
+    transform: scale(var(--mb-scale, 1));
+    transform-origin: top center;
+  }
+
+  /* Hlavní herní kontejner s pevným rozlišením 900x768px */
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('Recepce-bkg.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  /* ---- OBECNÉ HERNÍ ASSETY ---- */
+  .game-asset {
+    position: absolute;
+    display: block;
+    user-select: none;
+  }
+
+  /* Kontejner recepční s teleport efektem - zkopírováno z teleport.html.
+     Umístěn nad pozadím, ale pod pultem/zvonkem/Kolimbusem (viz z-index). */
+  #teleport-container {
+    position: absolute;
+    left: 463px;
+    top: 80px;
+    display: none; /* zobrazí se až ve fázi "Úvodní rozhovor" po kliknutí na zvonek */
+    z-index: 2;
+  }
+  #teleport-container.visible {
+    display: inline-block;
+  }
+  #img-recepcni {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    opacity: 1;
+  }
+  #teleport-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .particle {
+    position: absolute;
+    background-color: lightblue;
+    border-radius: 50%;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Pult, zvonek a Kolimbus - postupně rostoucí z-index nad recepční */
+  #img-pult {
+    left: 158px; top: 164px;
+    z-index: 3;
+  }
+  #img-zvonek {
+    left: 390px; top: 290px;
+    z-index: 4;
+    cursor: default;
+    pointer-events: none;
+  }
+  #img-zvonek.active {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  #img-kolimbus {
+    left: 34px; top: 417px;
+    z-index: 5;
+  }
+
+  /* ---- ŽLUTÁ BUBLINA (postupné fade in/out dle dokumentace) ---- */
+  #bubble-zluta {
+    left: 20px; top: 20px;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 2s linear;
+  }
+
+  /* ---- TEXTOVÉ BUBLINY (univerzální pro celý panel, klik = zavřít) ---- */
+  .bubble-text {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 60;
+    transition: transform 0.1s;
+  }
+  .bubble-text:hover {
+    transform: scale(1.02);
+  }
+
+  /* ---- INVENTÁŘ ----
+     Zkopírováno z u-klece-miniboss3-5.html, bez položek groovie, slivovice
+     a sponka (ty už byly použity v jiném panelu). Od začátku zobrazený. */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 350;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    cursor: default;
+    pointer-events: none;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .inv-item.active {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+  .inv-item.inv-hidden {
+    display: none;
+  }
+
+  /* ---- MODÁL "KNIHA HOSTŮ" ---- */
+  #modal-kniha {
+    position: absolute;
+    display: none;
+    left: 50%;
+    top: 50%;
+    width: 588px;
+    height: 344px;
+    transform: translate(-50%, -50%);
+    background-image: url('Recepce-kniha.png');
+    background-size: cover;
+    z-index: 400;
+  }
+  #modal-kniha.visible {
+    display: block;
+  }
+  /* Neviditelná oblast pro "podpis" - hráč zde musí nechat kurzor/prst 3s */
+  #podpis-zone {
+    position: absolute;
+    left: 30px;
+    top: 145px;
+    width: 150px;
+    height: 25px;
+    cursor: pointer;
+	z-index: 401;
+	/*background: rgba(20, 20, 20, 0.3);*/
+  }
+  #img-krouzek {
+    position: absolute;
+    left: 30px;
+    top: 145px;    
+    display: none;
+    z-index: 410;
+  }
+
+  /* ---- TLAČÍTKO "POKRAČOVAT" ---- */
+  #btn-pokracovat {
+    position: absolute;
+    right: 30px;
+    bottom: 30px;
+    display: none;
+    z-index: 500;
+    padding: 14px 36px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #111;
+    background: #00cc44;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    animation: pulse-continue 1.4s infinite ease-in-out;
+  }
+  @keyframes pulse-continue {
+    0%   { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50%  { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  /* --- DEFINICE TELEPORT ANIMACÍ (zkopírováno z teleport.html) --- */
+  @keyframes pulse-once {
+    0% { opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { opacity: 0; }
+  }
+  /* Dvojité bliknutí a objevení obrázku (opak "blink-and-vanish" z teleport.html) -
+     použito ve fázi "Úvodní rozhovor", kdy recepční postupně "přiteleportuje". */
+  @keyframes blink-and-appear {
+    0%   { opacity: 0; }
+    25%  { opacity: 1; }
+    50%  { opacity: 0; }
+    75%  { opacity: 1; }
+    90%  { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  /* Dvojité bliknutí a zmizení obrázku - použito ve fázi "Teleport" na konci panelu */
+  @keyframes blink-and-vanish {
+    0%   { opacity: 1; }
+    25%  { opacity: 0; }
+    50%  { opacity: 1; }
+    75%  { opacity: 0; }
+    90%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .anim-group-1 { animation: pulse-once 1000ms linear forwards; animation-delay: 0ms; }
+  .anim-group-2 { animation: pulse-once 1000ms linear forwards; animation-delay: 1000ms; }
+  .anim-group-3 { animation: pulse-once 1000ms linear forwards; animation-delay: 2000ms; }
+  .anim-group-4 { animation: pulse-once 1000ms linear forwards; animation-delay: 3000ms; }
+
+  .appear-trigger {
+    animation: blink-and-appear 1000ms ease-in-out forwards;
+  }
+  .vanish-trigger {
+    animation: blink-and-vanish 1000ms ease-in-out forwards;
+    animation-delay: 3500ms;
+  }
+
+  /* ====================================================================
+     RESPONZIVNÍ ÚPRAVA PRO MOBIL (portrait)
+     Souřadnice prvků UVNITŘ #game-container se nikdy nemění - scaluje
+     se celý #scene-wrapper pomocí CSS transformace (viz JS níže),
+     která dopočítá faktor zmenšení podle šířky displeje.
+     ==================================================================== */
+  @media (max-width: 920px) {
+    body { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-wrapper">
+  <div id="game-container">
+
+    <div id="teleport-container">
+      <img id="img-recepcni" src="recepcni.png" alt="Recepční">
+      <div id="teleport-effect"></div>
+    </div>
+
+    <img id="img-pult"     class="game-asset" src="Recepce-pult.png"   alt="Recepční pult">
+    <img id="img-zvonek"   class="game-asset" src="Recepce-zvonek.png" alt="Zvonek" onclick="clickZvonek()">
+    <img id="img-kolimbus" class="game-asset" src="Recepce-Kolimbus.png" alt="Kolimbus">
+
+    <img id="bubble-zluta" class="game-asset" src="Recepce-zluta-bublina.png" alt="...">
+
+    <!-- Univerzální obrázek pro textové bubliny - pozice/zdroj se mění dle fáze -->
+    <img id="active-text" class="bubble-text" src="" alt="Text" onclick="closeActiveText()">
+
+    <div id="inventory">
+      <img class="inv-item" id="inv-500" src="500-icon.png" alt="500" onclick="clickInv500()">
+      <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+      <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+      <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+      <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    </div>
+
+    <div id="modal-kniha">
+      <div id="podpis-zone"></div>
+      <img id="img-krouzek" src="Recepce-krouzek.png" alt="Podpisový kroužek">
+    </div>
+
+    <button id="btn-pokracovat" onclick="window.location.href='chodba.html'">Pokračovat</button>
+
+  </div>
+</div>
+
+<div id="modal-item-text" class="modal-overlay-item" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #ffcc00; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4;">Text předmětu...</p>
+    <button onclick="closeItemModal()" style="background:#ffcc00; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<audio id="audio-bgm"     src="Star-Trek.mp3" loop></audio>
+<audio id="sfx-harp"      src="harp.mp3"></audio>
+<audio id="sfx-zvonek"    src="zvonek-recepce.mp3"></audio>
+<audio id="sfx-teleport-in" src="teleport-in.mp3"></audio>
+<audio id="sfx-krouzek"   src="krouzek.mp3"></audio>
+<audio id="sfx-teleport-out" src="dark-teleport.mp3"></audio>
+
+<script>
+/* ==========================================================================
+   Hlavní herní logika. Komentováno po sekcích dle struktury dokumentace.
+   ========================================================================= */
+
+/* ---- RESPONZIVNÍ SCALE PRO MOBIL (portrait) ----
+   Logická scéna má vždy 900x768px. Na mobilu kontejner zmenšíme
+   pomocí CSS proměnné --mb-scale tak, aby šířka 900px odpovídala
+   šířce displeje. Souřadnice jednotlivých prvků v rámci scény se tím
+   NEMĚNÍ - jen se celá scéna i s prvky zmenší jako jeden celek. */
+function updateMobileScale() {
+  const SCENE_WIDTH = 900;
+  const viewportWidth = window.innerWidth;
+  let scale = 1;
+  if (viewportWidth < SCENE_WIDTH) {
+    scale = viewportWidth / SCENE_WIDTH;
+  }
+  document.documentElement.style.setProperty('--mb-scale', scale);
+
+  const wrapper = document.getElementById('scene-wrapper');
+  wrapper.style.marginBottom = (768 * scale - 768) + 'px';
+}
+window.addEventListener('resize', updateMobileScale);
+window.addEventListener('DOMContentLoaded', updateMobileScale);
+
+/* ---- POMOCNÉ FUNKCE PRO PŘEHRÁVÁNÍ ZVUKU ---- */
+function playSFX(elementId, volume = 1, loop = false) {
+  const sfx = document.getElementById(elementId);
+  if (!sfx) return null;
+  sfx.loop = loop;
+  if (!loop) sfx.currentTime = 0;
+  sfx.volume = volume;
+  sfx.play().catch(e => console.log('Audio waiting for interaction:', elementId));
+  return sfx;
+}
+function stopSFX(elementId) {
+  const sfx = document.getElementById(elementId);
+  if (sfx) { sfx.pause(); sfx.currentTime = 0; }
+}
+
+// Hudba na pozadí (Star-Trek.mp3, smyčka, 25 %) se aktivuje při prvním
+// kliknutí kvůli autoplay politice prohlížečů - vlastní handler.
+let bgmStarted = false;
+document.addEventListener('click', function initBGM() {
+  if (bgmStarted) return;
+  bgmStarted = true;
+  const bgm = document.getElementById('audio-bgm');
+  bgm.volume = 0.10;
+  bgm.play().catch(e => console.log('BGM waiting for interaction.'));
+});
+
+/* ==========================================================================
+   1) SESTAVENÍ SCÉNY
+   Recepční (s teleport efektem) je zatím schovaná (display:none na
+   #teleport-container), pult/zvonek/Kolimbus jsou viditelné od začátku
+   díky pořadí v HTML a nastaveným z-indexům.
+   ========================================================================== */
+
+/* ---- AKTIVACE INVENTÁŘE ----
+   Inventář je od začátku panelu vidět, ale klikatelný je až po zavření
+   první textové bubliny (text1). Od té chvíle lze na libovolný předmět
+   kdykoliv kliknout a zobrazit jeho textový popis - položka "500" navíc
+   ve fázi "Úplatek" provede svou speciální herní akci místo popisu. */
+function activateInventory() {
+  document.querySelectorAll('.inv-item').forEach(item => item.classList.add('active'));
+}
+let onTextClosed = null;
+function showText(imgSrc, x, y, callback) {
+  const el = document.getElementById('active-text');
+  el.src = imgSrc;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.display = 'block';
+  onTextClosed = callback;
+}
+function closeActiveText() {
+  const el = document.getElementById('active-text');
+  el.style.display = 'none';
+  const cb = onTextClosed;
+  onTextClosed = null;
+  if (cb) cb();
+}
+
+/* ==========================================================================
+   2) ÚVODNÍ ROZHOVOR
+   ========================================================================== */
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Žlutá bublina se postupně objeví (opacity 0 -> 100 % po dobu 2s).
+  const bublina = document.getElementById('bubble-zluta');
+  // Drobné zpoždění, aby prohlížeč stihl vykreslit počáteční opacity:0
+  // před spuštěním přechodu (jinak by se transition neaplikovala).
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      bublina.style.opacity = '1';
+    });
+  });
+
+  // OPRAVENO: Po doběhnutí přechodu na 100 % viditelnosti (opacity == 1) se hned 
+  // spustí schování žluté bubliny a přechod na Recepce-text1.png. Zvuk harp.mp3 
+  // se jen paralelně spustí na pozadí.
+  bublina.addEventListener('transitionend', function onFadeIn(e) {
+    if (e.propertyName !== 'opacity') return;
+    bublina.removeEventListener('transitionend', onFadeIn);
+
+    // Harp.mp3 pustíme, ale kód nečeká na jeho konec
+    playSFX('sfx-harp', 0.4);
+    
+    // Okamžitě začne schovávání žluté bubliny
+    bublina.style.opacity = '0';
+    bublina.addEventListener('transitionend', function onFadeOut(e2) {
+      if (e2.propertyName !== 'opacity') return;
+      bublina.removeEventListener('transitionend', onFadeOut);
+      
+      // Po zmizení bubliny se ihned objeví text1
+      showText('Recepce-text1.png', 405, 443, () => {
+        document.getElementById('img-zvonek').classList.add('active');
+        activateInventory();
+      });
+    });
+  });
+});
+
+function clickZvonek() {
+  const zvonek = document.getElementById('img-zvonek');
+  zvonek.classList.remove('active'); // zabránit opakovanému kliknutí
+  playSFX('sfx-zvonek', 0.3);
+
+  setTimeout(() => {
+    // Recepční se objeví s dvojitým probliknutím + zvuk teleport-in.mp3
+    const tc = document.getElementById('teleport-container');
+    const img = document.getElementById('img-recepcni');
+    tc.classList.add('visible');
+    img.classList.add('appear-trigger');
+    playSFX('sfx-teleport-in', 1);
+
+    img.addEventListener('animationend', function onAppear() {
+      img.removeEventListener('animationend', onAppear);
+      // Sekvence textů 2 - 5
+      showText('Recepce-text2.png', 646, 63, () => {
+        showText('Recepce-text3.png', 402, 394, () => {
+          showText('Recepce-text4.png', 617, 54, () => {
+            showText('Recepce-text5.png', 412, 409, () => {
+              // Po dokončení úvodního rozhovoru lze předmět "500" použít jako úplatek
+              canBribe500 = true;
+            });
+          });
+        });
+      });
+    }, { once: true });
+  }, 2000);
+}
+
+/* ==========================================================================
+   3) ÚPLATEK
+   ========================================================================== */
+// Dokud canBribe500 není true, klik na "500" jen zobrazí popis předmětu
+// (stejně jako u ostatních položek). Teprve po dokončení úvodního
+// rozhovoru se klik změní na skutečnou herní akci - úplatek.
+let canBribe500 = false;
+
+function clickInv500() {
+  if (!canBribe500) {
+    showItemText('500');
+    return;
+  }
+
+  const inv500 = document.getElementById('inv-500');
+  inv500.classList.remove('active');
+  inv500.classList.add('inv-hidden');
+
+  showText('Recepce-text6.png', 622, 59, () => {
+    showText('Recepce-text7.png', 404, 419, () => {
+      showText('Recepce-text8.png', 626, 44, () => {
+        openKnihaModal();
+      });
+    });
+  });
+}
+
+/* ==========================================================================
+   4) KNIHA HOSTŮ
+   ========================================================================== */
+let podpisTimer = null;
+let podpisDone = false;
+
+function openKnihaModal() {
+  podpisDone = false;
+  document.getElementById('modal-kniha').classList.add('visible');
+}
+
+function startPodpisTimer() {
+  if (podpisDone) return;
+  clearTimeout(podpisTimer);
+  podpisTimer = setTimeout(() => {
+    if (podpisDone) return;
+    podpisDone = true;
+    playSFX('sfx-krouzek', 0.5);
+    document.getElementById('img-krouzek').style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('img-krouzek').style.display = 'none';
+      document.getElementById('modal-kniha').classList.remove('visible');
+      // Pokračování textové sekvence po zavření modálu s knihou hostů
+      showText('Recepce-text9.png', 407, 364, () => {
+        showText('Recepce-text10.png', 649, 74, () => {
+          startTeleportEffect();
+        });
+      });
+    }, 2000);
+  }, 3000);
+}
+function cancelPodpisTimer() {
+  clearTimeout(podpisTimer);
+}
+
+const podpisZone = document.getElementById('podpis-zone');
+// Desktop - kurzor musí zůstat nad oblastí bez pohybu 3s
+podpisZone.addEventListener('mouseenter', startPodpisTimer);
+podpisZone.addEventListener('mouseleave', cancelPodpisTimer);
+// Mobil - prst musí být na oblasti přidržen 3s
+podpisZone.addEventListener('touchstart', (e) => { e.preventDefault(); startPodpisTimer(); }, { passive: false });
+podpisZone.addEventListener('touchend', cancelPodpisTimer);
+podpisZone.addEventListener('touchcancel', cancelPodpisTimer);
+
+/* ==========================================================================
+   5) TELEPORT
+   Kompletní efekt zkopírovaný z teleport.html (částice + dvojité
+   probliknutí a zmizení obrázku recepční), spuštěný automaticky
+   (bez tlačítka) po dokončení sekvence "Kniha hostů".
+   ========================================================================== */
+const randomRange = (min, max) => Math.random() * (max - min) + min;
+
+function createParticles(count, className) {
+  const overlay = document.getElementById('teleport-effect');
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement('div');
+    particle.classList.add('particle', className);
+
+    const size = randomRange(2, 9);
+    particle.style.width = `${size}px`;
+    particle.style.height = `${size}px`;
+
+    particle.style.left = `${randomRange(0, 100)}%`;
+    particle.style.top = `${randomRange(0, 100)}%`;
+
+    overlay.appendChild(particle);
+  }
+}
+
+function startTeleportEffect() {
+  const overlay = document.getElementById('teleport-effect');
+  const img = document.getElementById('img-recepcni');
+
+  overlay.innerHTML = '';
+  img.classList.remove('appear-trigger');
+  img.classList.remove('vanish-trigger');
+  void img.offsetWidth; // restart CSS animace
+
+  playSFX('sfx-teleport-out', 1);
+
+  createParticles(10, 'anim-group-1');
+  createParticles(20, 'anim-group-2');
+  createParticles(40, 'anim-group-3');
+  createParticles(60, 'anim-group-4');
+
+  img.classList.add('vanish-trigger');
+
+  setTimeout(() => {
+    overlay.innerHTML = '';
+  }, 4000);
+
+  // Celá animace (4 fáze částic + zmizení obrázku) odezní po 4500ms
+  setTimeout(() => {
+    showText('Recepce-text11.png', 385, 431, () => {
+      document.getElementById('btn-pokracovat').style.display = 'block';
+    });
+  }, 4500);
+}
+
+/* ==========================================================================
+   POMOCNÉ MODÁLY PRO INVENTÁŘ (předměty bez speciální herní akce)
+   ========================================================================== */
+const itemTexts = {
+  '500': "Bonus za úspěšné hospodaření Lesů České republiky. Čuráci.",
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí."
+};
+
+function showItemText(key) {
+  document.getElementById('item-description-text').innerText = itemTexts[key] || '';
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

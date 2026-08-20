@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hledání auta - Trasy</title>
+    <style>
+        :root {
+            --flashlight-size: 5px;
+            --detect-size: 50px;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Výchozí kurzor — auto (intro). Třída .game-mode skryje kurzor. */
+        #game-container {
+            position: relative;
+            width: 900px;
+            height: 768px;
+            cursor: auto;
+            background: #000;
+            flex-shrink: 0;
+        }
+
+        #game-container.game-mode {
+            cursor: none;
+        }
+
+        /* --- INTRO VRSTVA --- */
+        #intro-layer {
+            position: absolute;
+            inset: 0;
+            background-image: url('Pokoj-bkg.jpg');
+            background-size: cover;
+            background-position: center;
+            z-index: 10;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            /* padding-bottom: 20px; */
+            box-sizing: border-box;
+            cursor: auto;
+        }
+
+        #kolimbus-img {
+            display: block;
+            cursor: pointer;
+            max-height: 500px;
+            user-select: none;
+            transform: scale(1.00);
+        }
+
+        #kolimbus-img:hover {
+            transform: scale(1.03);
+        }
+
+        /* --- MAPA --- */
+        #map-layer {
+            position: absolute;
+            inset: 0;
+            background-image: url('mapa_900X768-Korzar.jpg');
+            background-size: cover;
+            background-position: center;
+            z-index: 1;
+        }
+
+        #car {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #ff0000;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 2;
+        }
+
+        #mask-overlay {
+            position: absolute;
+            inset: 0;
+            background: black;
+            z-index: 3;
+            pointer-events: none;
+            display: none; /* skryté do startu hry */
+
+            -webkit-mask-image: radial-gradient(
+                circle var(--flashlight-size) at var(--lx, -200%) var(--ly, -200%),
+                transparent 0%,
+                transparent 100%,
+                black 100%
+            );
+            mask-image: radial-gradient(
+                circle var(--flashlight-size) at var(--lx, -200%) var(--ly, -200%),
+                transparent 0%,
+                transparent 100%,
+                black 100%
+            );
+        }
+
+        #flashlight-ui {
+            position: absolute;
+            width: calc(var(--flashlight-size) * 2);
+            height: calc(var(--flashlight-size) * 2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 4;
+            /* Pozicování v lokálních souřadnicích kontejneru */
+            left: var(--lx, -200%);
+            top: var(--ly, -200%);
+            box-sizing: border-box;
+            display: none; /* skryté do startu hry */
+        }
+
+        #flashlight-ui::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: var(--detect-size);
+            height: var(--detect-size);
+            border: 2px solid rgba(255, 0, 0, 0.7);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #ui h2 {
+            margin: 0 0 8px 0;
+        }
+
+        #success-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #success-box {
+            background: #1e1e1e;
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        #success-box h2 {
+            margin-top: 0;
+        }
+
+        /* Styl pro OK tlačítko v modalu */
+        #success-box button {
+            background: #ffcc00;
+            color: #111;
+            border: none;
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            text-transform: uppercase;
+            margin-top: 15px;
+        }
+        #success-box button:hover { background: #ffee55; }
+
+        /* ---- TLAČÍTKO POKRAČOVAT (Závěr scény) ---- */
+        #btn-final-continue {
+            display: none;
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            background: #00cc44;
+            color: #fff;
+            border: none;
+            padding: 15px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 6px;
+            box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+            z-index: 90;
+            text-transform: uppercase;
+            animation: pulse 1.5s infinite;
+        }
+        #btn-final-continue:hover {
+            background: #00ee55;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+            50% { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+            100% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+
+    <div id="intro-layer">
+        <img id="kolimbus-img" src="Kolimbus1a.png" alt="Kolimbus" />
+    </div>
+
+    <div id="map-layer"></div>
+    <div id="car"></div>
+    <div id="mask-overlay"></div>
+    <div id="flashlight-ui"></div>
+
+    <div id="ui">
+        <h2 id="status"></h2>
+    </div>
+
+    <button id="btn-final-continue" onclick="window.location.href='meeting4.html'">Pokračovat</button>
+
+</div>
+
+<div id="success-modal">
+    <div id="success-box">
+        <h2>Výborně!</h2>
+        <p>Teď už vím, že cílem je hotel Korzár.</p>
+        <button onclick="confirmSuccess()">OK</button>
+    </div>
+</div>
+
+<script>
+    const MAP_WIDTH  = 900;
+    const MAP_HEIGHT = 768;
+
+    const gameContainer = document.getElementById('game-container');
+    const car           = document.getElementById('car');
+    const statusText    = document.getElementById('status');
+    const modal         = document.getElementById('success-modal');
+    const introLayer    = document.getElementById('intro-layer');
+    const kolimbusImg   = document.getElementById('kolimbus-img');
+    const maskOverlay   = document.getElementById('mask-overlay');
+    const flashlightUI  = document.getElementById('flashlight-ui');
+    const btnContinue   = document.getElementById('btn-final-continue');
+
+    // --- ZVUKOVÉ AUDIO AUDIO PRVKY ---
+    const soundSearching = new Audio('searching.wav');
+    soundSearching.loop = true; // Nastavení nekonečné smyčky
+	soundSearching.volume = 0.7;
+    
+    const soundFound = new Audio('found.wav');
+	
+	const hura = new Audio('yes.wav');
+	hura.volume = 0.8;
+	
+	const pop = new Audio('Nafukovacka2.wav');
+	pop.volume = 0.8;
+	
+	const fail = new Audio('Fail2.wav');
+	fail.volume = 0.8;
+
+    let gameActive = false;
+    let lockedOn   = false;
+    let introPhase = 1; // 1 = Kolimbus1.png, 2 = Kolimbus1-1.png
+
+    // Lokální souřadnice myši uvnitř #game-container
+    let localX = -200;
+    let localY = -200;
+
+    // --- PŘEPOČET SOUŘADNIC MYŠI NA LOKÁLNÍ ---
+    function updateLocalCoords(e) {
+        const rect = gameContainer.getBoundingClientRect();
+        localX = e.clientX - rect.left;
+        localY = e.clientY - rect.top;
+    }
+
+    function applyFlashlightPosition(x, y) {
+        gameContainer.style.setProperty('--lx', x + 'px');
+        gameContainer.style.setProperty('--ly', y + 'px');
+    }
+
+    // --- INTRO KLIKÁNÍ ---
+    kolimbusImg.addEventListener('click', () => {
+        if (introPhase === 1) {
+            kolimbusImg.src = 'Kolimbus1-1.png';
+            introPhase = 2;
+        } else if (introPhase === 2) {
+            introLayer.style.display = 'none';
+            // Zapnout herní kurzor (none) a zobrazit herní prvky
+            gameContainer.classList.add('game-mode');
+            maskOverlay.style.display = 'block';
+            flashlightUI.style.display = 'block';
+            
+            // SPUŠTĚNÍ ZVUKU: Uživatelské kliknutí splňuje podmínku prohlížeče pro autoplay audio
+            soundSearching.currentTime = 0;
+            soundSearching.play().catch(err => console.log("Audio play failed:", err));
+            
+            startGame();
+        }
+    });
+
+    // --- POHYB MYŠI ---
+    window.addEventListener('mousemove', e => {
+        updateLocalCoords(e);
+
+        if (!lockedOn) {
+            applyFlashlightPosition(localX, localY);
+        }
+
+        if (gameActive && !lockedOn) {
+            // Střed tečky v souřadnicích okna
+            const carRect = car.getBoundingClientRect();
+            const carX = carRect.left + carRect.width  / 2;
+            const carY = carRect.top  + carRect.height / 2;
+
+            // Myš v souřadnicích okna
+            const dist = Math.hypot(e.clientX - carX, e.clientY - carY);
+
+            // Poloměr červeného kruhu = --detect-size / 2 = 25px
+            if (dist < 25) {
+                lockOnTarget();
+            }
+        }
+    });
+
+    async function startGame() {
+        gameActive = true;
+        lockedOn   = false;
+		
+		animateFlashlightGrow(5, 75, 3000);
+		pop.play();
+
+        statusText.innerText = 'HLEDÁM...';
+        modal.style.display  = 'none';
+        car.style.display    = 'block';
+        btnContinue.style.display = 'none'; // Skrýt při startu nové hry
+
+        const routes = [
+            // ČERVENÁ
+            [
+                { x: 604, y: 110 },
+                { x: 585, y: 90  },
+                { x: 405, y: 9   },
+                { x: 210, y: 219 },
+                { x: 91,  y: 418 },
+                { x: 21,  y: 555 },
+                { x: 220, y: 606 },
+                { x: 450, y: 695 }
+            ],
+            // MODRÁ
+            [
+                { x: 604, y: 110 },
+                { x: 777, y: 105 },
+                { x: 777, y: 270 },
+                { x: 777, y: 451 },
+                { x: 747, y: 494 },
+                { x: 677, y: 460 },
+                { x: 609, y: 620 },
+                { x: 539, y: 733 },
+                { x: 450, y: 695 }
+            ],
+            // ZELENÁ
+            [
+                { x: 604, y: 110 },
+                { x: 608, y: 133 },
+                { x: 608, y: 299 },
+                { x: 564, y: 405 },
+                { x: 478, y: 359 },
+                { x: 358, y: 656 },
+                { x: 450, y: 695 }
+            ]
+        ];
+
+        const route = routes[Math.floor(Math.random() * routes.length)];
+
+        car.style.transition = 'none';
+        car.style.left = pxToPercentX(route[0].x) + '%';
+        car.style.top  = pxToPercentY(route[0].y) + '%';
+
+        await new Promise(r => setTimeout(r, 100));
+
+        for (let i = 1; i < route.length; i++) {
+            if (!gameActive) break;
+
+            car.style.transition = 'all 4s linear';
+            car.style.left = pxToPercentX(route[i].x) + '%';
+            car.style.top  = pxToPercentY(route[i].y) + '%';
+
+            const startTime = performance.now();
+            const duration  = 4000;
+
+            while (performance.now() - startTime < duration && gameActive) {
+                if (lockedOn) {
+                    const rect  = car.getBoundingClientRect();
+                    const cxAbs = rect.left + rect.width  / 2;
+                    const cyAbs = rect.top  + rect.height / 2;
+                    const containerRect = gameContainer.getBoundingClientRect();
+                    const cxLoc = cxAbs - containerRect.left;
+                    const cyLoc = cyAbs - containerRect.top;
+                    applyFlashlightPosition(cxLoc, cyLoc);
+                }
+                await new Promise(r => requestAnimationFrame(r));
+            }
+        }
+
+        if (lockedOn && gameActive) {
+            statusText.innerText = 'CÍL NALEZEN';
+            modal.style.display  = 'flex';
+            soundSearching.pause();
+			hura.play();
+			gameActive = false;
+            return;
+        }
+
+        if (gameActive) {
+            statusText.innerText = 'UTEKL MI!';
+			fail.play();
+            resetGame();
+        }
+    }
+
+    function lockOnTarget() {
+        lockedOn = true;
+        statusText.innerText = 'SLEDUJI CÍL...';
+        
+        // ZASTAVENÍ VYHLEDÁVACÍHO ZVUKU A SPUŠTĚNÍ ZVUKU "NAVRACENO / FOUND"
+        //soundSearching.pause();
+		soundSearching.volume = 0.2;
+        soundFound.currentTime = 0;
+        soundFound.play().catch(err => console.log("Audio play failed:", err));
+
+        animateFlashlightGrow(75, 150, 600);
+    }
+
+    function animateFlashlightGrow(from, to, duration) {
+        const startTime = performance.now();
+
+        function step(now) {
+            const elapsed  = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased    = 1 - Math.pow(1 - progress, 3);
+            const current  = from + (to - from) * eased;
+
+            gameContainer.style.setProperty('--flashlight-size', current + 'px');
+
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            }
+        }
+
+        requestAnimationFrame(step);
+    }
+
+    function resetGame() {
+        gameActive = false;
+        lockedOn   = false;
+
+        // Vypnutí zvuků při resetu (pokud by ještě hrály)
+        soundSearching.pause();
+        soundFound.pause();
+
+        car.style.display = 'none';
+        maskOverlay.style.display   = 'none';
+        flashlightUI.style.display  = 'none';
+        gameContainer.classList.remove('game-mode');
+
+        introPhase = 1;
+        kolimbusImg.src = 'Kolimbus1.png';
+        introLayer.style.display = 'flex';
+        statusText.innerText = '';
+    }
+
+    // --- POTVRZENÍ MODALU ---
+    function confirmSuccess() {
+        modal.style.display = 'none';
+        btnContinue.style.display = 'block'; // Zobrazí pulzující tlačítko
+    }
+
+    function pxToPercentX(px) { return (px / MAP_WIDTH)  * 100; }
+    function pxToPercentY(px) { return (px / MAP_HEIGHT) * 100; }
+</script>
+</body>
+</html>

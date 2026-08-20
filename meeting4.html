@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktivní Komiks - Část Meeting s Modalem</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+
+        /* 1) Herní kontejner 900x768px */
+        #game-container {
+            width: 900px;
+            height: 768px;
+            position: relative;
+            overflow: hidden;
+            background-image: url('pokoj_blur.jpg');
+            background-position: center;
+            background-size: cover;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Společný styl pro absolutně pozicované herní prvky */
+        .game-element {
+            position: absolute;
+            display: none;
+            cursor: pointer;
+        }
+
+        /* 1) Kontejner pro inventář u horního okraje */
+        #inventory {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #inventory img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        #inventory img:hover {
+            transform: scale(1.1);
+        }
+
+        /* Styl pro MODAL (vyskakovací komentář) */
+        #comment-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5); /* Ztmavnutí scény na pozadí */
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200; /* Nad všemi ostatními prvky */
+            cursor: pointer;
+        }
+
+        .modal-content {
+            background: #222;
+            color: #fff;
+            padding: 20px 40px;
+            border-radius: 10px;
+            border: 2px solid #555;
+            font-size: 18px;
+            text-align: center;
+            max-width: 80%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            pointer-events: none; /* Kliknutí kdekoli na modal (i na text) ho zavře */
+        }
+
+        /* 3) Telefon a jeho animace vyjetí */
+        #phone {
+            bottom: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: bottom 1s ease-out;
+            z-index: 10;
+            cursor: default;
+        }
+        #phone.active {
+            bottom: 0px;
+        }
+        #phone.slide-down {
+            bottom: -100%;
+        }
+
+        .phone-overlay {
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 0px;
+            z-index: 11;
+        }
+
+        /* Nové prvky pro animaci nad displejem telefonu */
+        #swipe-area {
+            position: absolute;
+            left: 233px;
+            top: 313px;
+            width: 434px;
+            height: 134px;
+            overflow: hidden;
+            z-index: 15;
+            display: none;
+        }
+
+        #kamilah-ai {
+            position: absolute;
+            left: 150%; /* Výchozí pozice upravena vpravo mimo div pro úvodní nájezd */
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 16;
+            display: none;
+            transition: left 0.4s ease-out; /* Přidán plynulý přechod i pro nájezd scény */
+        }
+
+        #anim-finger {
+            position: absolute;
+            left: 223px;
+            top: 353px;
+            z-index: 17;
+            display: none;
+        }
+
+        /* Pozicování postav na spodním okraji */
+        .char-left { left: 150px; bottom: 0; z-index: 20; }
+        .char-right { right: 100px; bottom: 0; z-index: 20; }
+
+        /* Pozicování textových bublin */
+        .text-top-left { left: 20px; top: 80px; z-index: 30; }
+        .text-top-right { right: 20px; top: 80px; z-index: 30; }
+        .text-bottom-left { left: 20px; bottom: 80px; z-index: 30; }
+        .text-bottom-right { right: 20px; bottom: 80px; z-index: 30; }
+		.text-top-left1 { left: 90px; top: 80px; z-index: 30; }
+        .text-top-right1 { right: 120px; top: 80px; z-index: 30; }		
+		.text-top-left2 { left: 160px; top: 90px; z-index: 30; }
+
+        /* 21) Pulzující tlačítko Pokračovat */
+        #btn-continue {
+            position: absolute;
+            right: 40px;
+            bottom: 40px;
+            padding: 15px 35px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(45deg, #ff416c, #ff4b2b);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4);
+            display: none;
+            z-index: 40;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 4px 25px rgba(255, 65, 108, 0.7); }
+            100% { transform: scale(1); box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="inventory"></div>
+
+    <div id="comment-modal">
+        <div class="modal-content" id="modal-text">Komentář...</div>
+    </div>
+
+    <img id="phone" class="game-element" src="phone.png" alt="Telefon">
+    <img id="phone-loading" class="game-element phone-overlay" src="phone-loading.png" alt="Načítání">
+    <img id="phone-meeting" class="game-element phone-overlay" src="phone-meeting.png" alt="Meeting">
+
+    <div id="swipe-area">
+        <img id="kamilah-ai" src="Kamilah-ai.png" alt="Kamilah AI">
+    </div>
+    <img id="anim-finger" src="prst.png" alt="Ukazovátko prst">
+
+    <img id="kolimbus-m1" class="game-element char-left" src="Kolimbus-meeting1.png">
+    <img id="kolimbus-m2" class="game-element char-left" src="Kolimbus-meeting2.png">
+    <img id="kolimbus-m3" class="game-element char-left" src="Kolimbus-meeting3.png">
+    <img id="standa1" class="game-element char-right" src="standa1.png">
+    <img id="standa2" class="game-element char-right" src="standa2.png">
+
+    <img id="text1" class="game-element text-top-left" src="text1-meeting.png">
+    <img id="text2" class="game-element text-top-right" src="text2-meeting.png">
+    <img id="text3" class="game-element text-top-left" src="text3-meeting.png">
+    <img id="text4" class="game-element text-bottom-left" src="text4-meeting.png">
+    <img id="text5" class="game-element text-top-left" src="text5-meeting.png">
+    <img id="text6" class="game-element text-bottom-right" src="text6-meeting.png">
+    <img id="text7" class="game-element text-top-left" src="text7-meeting.png">
+    <img id="text8" class="game-element text-top-left1" src="text8-meeting.png">
+    <img id="text9" class="game-element text-top-right1" src="text9-meeting.png">
+    <img id="text10" class="game-element text-top-left2" src="text10-meeting.png">
+    <img id="text11" class="game-element text-top-left2" src="text11-meeting.png">
+
+    <button id="btn-continue">Pokračovat</button>
+</div>
+
+<audio id="snd-modem" src="modem-cut.mp3"></audio>
+<audio id="snd-grab" src="grab.wav"></audio>
+<audio id="snd-zvonek" src="zvonek.mp3"></audio>
+<audio id="snd-stopy" src="stopy.mp3"></audio>
+
+<audio id="snd-sefujes" src="sefujes.mp3"></audio>
+<audio id="snd-mission" src="mission.mp3" loop></audio>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        initGame();
+    });
+
+    const container = document.getElementById('game-container');
+    const inventory = document.getElementById('inventory');
+    const modal = document.getElementById('comment-modal');
+    const modalText = document.getElementById('modal-text');
+    
+    // Zvuky
+    const sndModem = document.getElementById('snd-modem');
+    const sndGrab = document.getElementById('snd-grab');
+    const sndZvonek = document.getElementById('snd-zvonek');
+	const sndStopy = document.getElementById('snd-stopy');
+	sndStopy.volume = 0.5;
+
+    // Handlery pro nové zvuky
+    const sndSefujes = document.getElementById('snd-sefujes');
+    sndSefujes.volume = 0.3;
+    const sndMission = document.getElementById('snd-mission');
+    sndMission.volume = 0.15;
+
+    // Definice textů pro jednotlivé ikonky
+    const itemComments = {
+        'groovie-icon.png': 'Ashe zatím povolat nepotřebuju',
+        'autoplay-icon.png': 'To si nechám až na finále',
+        'joint-icon.png': 'Špeka si dám až později, až všechno vyřídím.'
+    };
+
+    // Upravená funkce pro přidání do inventáře s navázáním kliknutí na modal
+    function addToInventory(iconSrc) {
+        inventory.style.opacity = '1';
+        const img = document.createElement('img');
+        img.src = iconSrc;
+        
+        // Po kliknutí na ikonku v inventáři se zobrazí modal s příslušným textem
+        img.addEventListener('click', (e) => {
+            e.stopPropagation(); // Zamezí nechtěnému kliknutí do pozadí scény
+            if (itemComments[iconSrc]) {
+                modalText.innerText = itemComments[iconSrc];
+                modal.style.display = 'flex';
+            }
+        });
+
+        inventory.appendChild(img);
+    }
+
+    // Zavření modalu po kliknutí kamkoli na něj
+    modal.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    function showEl(id) {
+        const el = document.getElementById(id);
+        if(el) el.style.display = 'block';
+    }
+
+    function hideEl(id) {
+        const el = document.getElementById(id);
+        if(el) el.style.display = 'none';
+    }
+
+    function initGame() {
+        // 3) Vyjede telefon
+        const phone = document.getElementById('phone');
+        phone.style.display = 'block';
+        setTimeout(() => { phone.classList.add('active'); }, 50);
+
+        // 4) Objeví se Kolimbus-meeting1
+        showEl('kolimbus-m1');
+
+        // 5) Klik na Kolimbus-meeting1
+        document.getElementById('kolimbus-m1').addEventListener('click', () => {
+            hideEl('kolimbus-m1');
+            
+            // Krok 1 & 2: Zobrazení prvků pro animaci a spuštění zvuku sefujes.mp3
+            const swipeArea = document.getElementById('swipe-area');
+            const kamilahAi = document.getElementById('kamilah-ai');
+            const animFinger = document.getElementById('anim-finger');
+            
+            swipeArea.style.display = 'block';
+            
+            // Nastavení výchozí mimodisplejové pozice pro Kamilah-ai.png před zobrazením
+            kamilahAi.style.transition = 'none';
+            kamilahAi.style.left = '150%';
+            kamilahAi.style.display = 'block';
+            
+            animFinger.style.display = 'block';
+            
+            // Výchozí pozice prstu na začátku animace
+            animFinger.style.transition = 'none';
+            animFinger.style.left = '223px';
+            animFinger.style.top = '353px';
+            
+            sndSefujes.play();
+
+            // Spuštění plynulých pohybů hned po vykreslení prvků
+            setTimeout(() => {
+                // Kamilah-ai.png plynule najede zprava doprostřed swipe-area
+                kamilahAi.style.transition = 'left 0.4s ease-out';
+                kamilahAi.style.left = '50%';
+
+                // Prst se pomalu přesouvá během 4 sekund trvání zvuku sefujes.mp3
+                animFinger.style.transition = 'left 4s linear, top 4s linear';
+                animFinger.style.left = '243px';
+                animFinger.style.top = '333px';
+            }, 20);
+
+            // Po skončení zvuku (4s) se spustí rychlý švih a přesun prstu k tlačítku
+            setTimeout(() => {
+                // Rychlý pohyb prstu doprava
+                animFinger.style.transition = 'left 0.15s ease-out, top 0.15s ease-out';
+                animFinger.style.left = '263px';
+                animFinger.style.top = '333px';
+
+                // Vyjetí Kamilah-ai.png doprava ven ze swipe-area
+                kamilahAi.style.transition = 'left 0.3s ease-in';
+                kamilahAi.style.left = '150%'; 
+
+                // Po odjetí postavy schováme celou swipe-area a kamilah-ai
+                setTimeout(() => {
+                    swipeArea.style.display = 'none';
+                    kamilahAi.style.display = 'none';
+                }, 300);
+
+                // Krok 3: Prst přejede na pozici 323, 702px
+                setTimeout(() => {
+                    animFinger.style.transition = 'left 0.5s ease-in-out, top 0.5s ease-in-out';
+                    animFinger.style.left = '323px';
+                    animFinger.style.top = '702px';
+
+                    // Přesune se na pozici 319, 698px
+                    setTimeout(() => {
+                        animFinger.style.transition = 'left 0.15s linear, top 0.15s linear';
+                        animFinger.style.left = '319px';
+                        animFinger.style.top = '698px';
+
+                        // Prst rychle zmizí dolů mimo container a pokračuje původní načítání
+                        setTimeout(() => {
+                            animFinger.style.transition = 'top 0.3s ease-in';
+                            animFinger.style.top = '800px';
+
+                            setTimeout(() => {
+                                animFinger.style.display = 'none';
+                                
+                                // Původní sekvence spuštění modemu a phone-loading
+                                showEl('phone-loading');
+                                sndModem.play();
+                            }, 300);
+
+                        }, 250);
+
+                    }, 550);
+
+                }, 200);
+
+            }, 4020);
+        });
+
+        // 6) Po dohrání zvuku modemu
+        sndModem.addEventListener('ended', () => {
+            hideEl('phone-loading');
+            showEl('phone-meeting');
+            
+            // Krok 4: Spuštění hudby na pozadí mission.mp3 ve smyčce
+            sndMission.currentTime = 0;
+            sndMission.play();
+            
+            showEl('text1'); // 7)
+        });
+
+        // 8) Klik na text1
+        document.getElementById('text1').addEventListener('click', () => {
+            hideEl('text1');
+            showEl('text2');
+        });
+
+        // 9) Klik na text2 -> Přidá groovie-icon.png
+        document.getElementById('text2').addEventListener('click', () => {
+            hideEl('text2');
+            addToInventory('groovie-icon.png');
+            sndGrab.play();
+            showEl('text3');
+        });
+
+        // 10) Klik na text3
+        document.getElementById('text3').addEventListener('click', () => {
+            hideEl('text3');
+            showEl('text4');
+        });
+
+        // 11) Klik na text4
+        document.getElementById('text4').addEventListener('click', () => {
+            hideEl('text4');
+            showEl('text5');
+        });
+
+        // 12) Klik na text5
+        document.getElementById('text5').addEventListener('click', () => {
+            hideEl('text5');
+            showEl('text6');
+        });
+
+        // 13) Klik na text6 -> Přidá stopautoplay-icon.png
+        document.getElementById('text6').addEventListener('click', () => {
+            hideEl('text6');
+            addToInventory('autoplay-icon.png');
+            sndGrab.play();
+            showEl('text7');
+        });
+
+        // 14) Klik na text7 -> Změna pozadí, telefon dolů
+        document.getElementById('text7').addEventListener('click', () => {
+            hideEl('text7');
+            container.style.backgroundImage = "url('pokoj-meeting.jpg')";
+            
+            const phoneMeeting = document.getElementById('phone-meeting');
+            const phone = document.getElementById('phone');
+            phoneMeeting.style.display = 'none'; 
+            phone.classList.remove('active');
+            phone.classList.add('slide-down');
+
+            // Krok 4: Postupné ztišení (fade-out) zvuku mission.mp3
+            let fadeVolume = sndMission.volume;
+            const fadeInterval = setInterval(() => {
+                if (fadeVolume > 0.01) {
+                    fadeVolume -= 0.01;
+                    sndMission.volume = Math.max(0, fadeVolume);
+                } else {
+                    clearInterval(fadeInterval);
+                    sndMission.pause();
+                    sndMission.volume = 0.15; // Reset základní hlasitosti
+                }
+            }, 30);
+
+            showEl('kolimbus-m2'); // 15)
+            sndZvonek.play();
+        });
+
+        // 16) Klik na Kolimbus-meeting2
+        document.getElementById('kolimbus-m2').addEventListener('click', () => {
+            hideEl('kolimbus-m2');
+            showEl('kolimbus-m3');
+            showEl('text8');
+            showEl('standa1');
+			sndStopy.play();
+            
+            setTimeout(() => {
+                container.addEventListener('click', handleGlobalClick);
+            }, 50);
+        });
+
+        // 17) Klik kamkoli
+        function handleGlobalClick(e) {
+            if (e.target.id === 'text8' || modal.style.display === 'flex') return; 
+            container.removeEventListener('click', handleGlobalClick);
+            showEl('text9');
+			hideEl('text8'); 
+        }
+
+        // 18) Klik na text9
+        document.getElementById('text9').addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideEl('text9');
+            hideEl('standa1');
+            showEl('standa2');
+        });
+
+        // 19) Klik na standa2 -> Přidá joint-icon.png
+        document.getElementById('standa2').addEventListener('click', () => {
+            hideEl('standa2');
+            showEl('standa1');
+            showEl('text10');
+            addToInventory('joint-icon.png');
+            sndGrab.play();
+        });
+
+        // 20) Klik na text10
+        document.getElementById('text10').addEventListener('click', () => {
+            hideEl('text10');
+            hideEl('standa1');
+            showEl('text11');
+        });
+
+        // 21) Klik na text11 -> Tlačítko pokračovat
+        document.getElementById('text11').addEventListener('click', () => {
+            hideEl('text11');
+            showEl('btn-continue');
+        });
+        
+        // UPRAVENÁ ČÁST: Přesměrování na hledani4.html místo vyskakovacího okna
+        document.getElementById('btn-continue').addEventListener('click', () => {
+            window.location.href = 'hledani4.html';
+        });
+    }
+</script>
+
+</body>
+</html>

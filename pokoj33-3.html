@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Pokoj 33</title>
+<style>
+  /* ====================================================================
+     KOLIMBUS - PANEL "POKOJ 33"
+     ==================================================================== */
+
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    background: #111;
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #scene-wrapper {
+    position: relative;
+    width: 900px;
+    height: 768px;
+    transform: scale(var(--mb-scale, 1));
+    transform-origin: top center;
+  }
+
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('pokoj-33-bkg-01.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  .game-asset {
+    position: absolute;
+    display: block;
+    user-select: none;
+  }
+
+  /* --- Sestavení scény --- */
+  #img-trezor { left: 350px; top: 489px; z-index: 10; cursor: pointer; }
+  #img-trezor-open { left: 350px; top: 489px; z-index: 10; display: none; cursor: pointer; }
+  #img-postel { left: 471px; top: 475px; z-index: 12; pointer-events: none; }
+  #img-plakatek { left: 615px; top: 526px; z-index: 13; cursor: pointer; }
+  #img-kolimbus { left: 350px; top: 479px; z-index: 14; pointer-events: none; }
+  
+  #kalkulacka {
+    position: absolute;
+    left: 116px; top: 493px;
+    width: 106px; height: 62px;
+    z-index: 15;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  #img-plakatek-dtl {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 500;
+    display: none;
+    cursor: pointer;
+  }
+
+  /* Obrázky stavů ukončení */
+  #img-exposed {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 500;
+    display: none;
+    cursor: pointer;
+  }
+  #img-busted {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 550;
+    display: none;
+    cursor: pointer;
+  }
+
+  /* Bílý efektový obdélník pro pleshbang */
+  #white-overlay {
+    position: absolute;
+    inset: 0;
+    background: #ffffff;
+    opacity: 0;
+    z-index: 530;
+    display: none;
+    pointer-events: none;
+    transition: opacity 1.5s ease-in-out;
+  }
+
+  #img-flipper-sml {
+    position: absolute;
+    left: 396px; top: 537px;
+    z-index: 11;
+    display: none;
+    cursor: pointer;
+  }
+
+  .bubble-text {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 100;
+    transition: transform 0.1s;
+  }
+  .bubble-text:hover {
+    transform: scale(1.02);
+  }
+
+  #text1 { left: 224px; top: 228px; display: block; }
+  #text2 { left: 278px; top: 270px; }
+  #text3 { left: 208px; top: 293px; z-index: 501; }
+  #text4 { left: 202px; top: 227px; }
+  #text5 { left: 173px; top: 246px; }
+
+  /* --- ČASOVAČ --- */
+  #timer {
+    position: absolute;
+    top: 80px; right: 30px;
+    font-size: 30px;
+    color: #ff0000;
+    font-weight: bold;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px 10px;
+    border-radius: 4px;
+    display: none;
+  }
+
+  /* --- INVENTÁŘ --- */
+  #inventory {
+    position: absolute;
+    top: 15px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .inv-item {
+    width: 48px; height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  /* --- MODÁLNÍ OKNO MINIHRY SEJFU --- */
+  #modal-safe-game {
+    position: absolute;
+    display: none;
+    left: 50%; top: 50%;
+    width: 723px; height: 582px;
+    transform: translate(-50%, -50%);
+    background-color: #888888;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    z-index: 400;
+    user-select: none;
+  }
+  #modal-safe-game.visible {
+    display: block;
+  }
+
+  #safe-inner-container {
+    width: 100%; height: 100%;
+    background-color: #4a2312;
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #calc-rotator-wrapper {
+    position: absolute;
+    left: 107px; top: 110px;
+    width: 320px; height: 350px;
+    transform-origin: center center;
+    transition: transform 0.6s ease-in-out;
+  }
+
+  #img-kalkulacka-art {
+    position: absolute;
+    left: 0; top: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  #calc-buttons-container {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+  }
+
+  .calc-btn-zone {
+    position: absolute;
+    background: rgba(255, 255, 255, 0);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .calc-btn-zone:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  #btn-rotate-calc {
+    position: absolute;
+    right: 40px; top: 40px;
+    width: 65px; height: 65px;
+    border-radius: 50%;
+    background: #27ae60 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/></svg>') no-repeat center;
+    background-size: 65%;
+    border: 3px solid #fff;
+    cursor: pointer;
+    z-index: 450;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.2s;
+  }
+  #btn-rotate-calc:hover {
+    transform: scale(1.08);
+  }
+
+  #img-papirek {
+    position: absolute;
+    right: 20px; bottom: 20px;
+    pointer-events: none;
+  }
+
+  #calc-display-container {
+    position: absolute;
+    left: 12px; top: 63px;
+    width: 164px; height: 35px;
+    background: transparent;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    overflow: hidden;
+    padding-right: 4px;
+    pointer-events: none;
+    z-index: 410;
+  }
+
+  #calc-display-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 24px;
+    color: #331a1a;
+    letter-spacing: 2px;
+    display: flex;
+    flex-direction: row-reverse;
+  }
+
+  .display-char {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+  }
+
+  #calc-display-text .display-char:first-child {
+    clip-path: inset(33% 0% 30% 0%);
+  }
+
+  /* --- TLAČÍTKO POKRAČOVAT --- */
+  #btn-pokracovat {
+    position: absolute;
+    right: 40px; bottom: 40px;
+    display: none;
+    z-index: 300;
+    padding: 15px 40px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #111;
+    background: #00cc44;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    animation: pulse-continue 1.4s infinite ease-in-out;
+  }
+
+  @keyframes pulse-continue {
+    0%   { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50%  { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  @keyframes respawn-blink {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0; }
+  }
+  .respawn-animation {
+    animation: respawn-blink 0.6s ease-in-out 2;
+  }
+
+  @media (max-width: 920px) {
+    body { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-wrapper">
+  <div id="game-container">
+
+    <img id="img-trezor" class="game-asset" src="pokoj-33-trezor.png" alt="Trezor" onclick="clickTrezor()">
+    <img id="img-trezor-open" class="game-asset" src="pokoj-33-trezor-open.png" alt="Otevřený trezor">
+    <img id="img-flipper-sml" class="game-asset" src="pokoj-33-flipper-sml.png" alt="Flipper" onclick="clickFlipper()">
+    <img id="img-postel" class="game-asset" src="pokoj-33-postel.png" alt="Postel">
+    <img id="img-plakatek" class="game-asset" src="pokoj-33-plakatek.png" alt="Plakátek" onclick="clickPlakatek()">
+    <img id="img-kolimbus" class="game-asset" src="pokoj-33-Kolimbus.png" alt="Kolimbus">
+    
+    <div id="kalkulacka" onclick="openCalcModal()"></div>
+
+    <img id="img-plakatek-dtl" src="pokoj-33-plakatek-dtl.png" alt="Plakátek Detail" onclick="closePlakatekDtl()">
+    <img id="text1" class="bubble-text" src="pokoj-33-text1.png" alt="Text 1" onclick="closeText1()">
+    <img id="text2" class="bubble-text" src="pokoj-33-text2.png" alt="Text 2" onclick="closeBubble('text2')">
+    <img id="text3" class="bubble-text" src="pokoj-33-text3.png" alt="Text 3" onclick="closeText3Bubble()">
+    <img id="text4" class="bubble-text" src="pokoj-33-text4.png" alt="Text 4" onclick="closeText4()">
+    <img id="text5" class="bubble-text" src="pokoj-33-text5.png" alt="Text 5" onclick="closeText5()">
+
+    <img id="img-exposed" src="pokoj-33-exposed.png" alt="Odhalen" onclick="clickExposed()">
+    <img id="img-busted" src="pokoj-33-busted.png" alt="Chycen" onclick="restartPanel()">
+    
+    <div id="white-overlay"></div>
+
+    <div id="timer">2:34</div>
+
+    <div id="inventory">
+      <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+      <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+      <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+      <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    </div>
+
+    <div id="modal-safe-game">
+      <div id="safe-inner-container">
+        <button id="btn-rotate-calc" onclick="toggleCalcRotation()"></button>
+        <img id="img-papirek" src="pokoj-33-papirek.png" alt="Nápověda">
+
+        <div id="calc-rotator-wrapper">
+          <img id="img-kalkulacka-art" src="pokoj-33-kalk.png" alt="Kalkulačka">
+
+          <div id="calc-display-container">
+            <div id="calc-display-text"></div>
+          </div>
+
+          <div id="calc-buttons-container">
+            <div class="calc-btn-zone" style="left:16px; top:140px; width:57px; height:35px;" onclick="pressCalcKey('C')"></div>
+            <div class="calc-btn-zone" style="left:16px; top:188px; width:36px; height:34px;" onclick="pressCalcKey('7')"></div>
+            <div class="calc-btn-zone" style="left:63px; top:188px; width:36px; height:34px;" onclick="pressCalcKey('8')"></div>
+            <div class="calc-btn-zone" style="left:107px; top:188px; width:36px; height:34px;" onclick="pressCalcKey('9')"></div>
+            <div class="calc-btn-zone" style="left:16px; top:232px; width:36px; height:34px;" onclick="pressCalcKey('4')"></div>
+            <div class="calc-btn-zone" style="left:63px; top:232px; width:36px; height:34px;" onclick="pressCalcKey('5')"></div>
+            <div class="calc-btn-zone" style="left:107px; top:232px; width:36px; height:34px;" onclick="pressCalcKey('6')"></div>
+            <div class="calc-btn-zone" style="left:16px; top:273px; width:36px; height:34px;" onclick="pressCalcKey('1')"></div>
+            <div class="calc-btn-zone" style="left:63px; top:273px; width:36px; height:34px;" onclick="pressCalcKey('2')"></div>
+            <div class="calc-btn-zone" style="left:107px; top:273px; width:36px; height:34px;" onclick="pressCalcKey('3')"></div>
+            <div class="calc-btn-zone" style="left:16px; top:318px; width:57px; height:35px;" onclick="pressCalcKey('0')"></div>
+            <div class="calc-btn-zone" style="left:85px; top:318px; width:36px; height:34px;" onclick="pressCalcKey('.')"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <button id="btn-pokracovat" onclick="window.location.href='brana3-1.html'">Pokračovat</button>
+
+  </div>
+</div>
+
+<div id="modal-item-text" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #00cc44; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4; color:#fff;"></p>
+    <button onclick="closeItemModal()" style="background:#00cc44; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<audio id="sound-time" src="time.mp3"></audio>
+<audio id="sound-kalk" src="kalk.mp3"></audio>
+<audio id="sound-safe-fail" src="safe-fail.mp3"></audio>
+<audio id="sound-safe-open" src="safe-open.mp3"></audio>
+<audio id="sound-exposed" src="exposed.mp3"></audio>
+<audio id="sound-flashbang" src="pleshbang.mp3"></audio>
+<audio id="sound-wasted" src="wasted.mp3"></audio>
+
+<script>
+/* ==========================================================================
+   HLAVNÍ LOGIKA PANELU
+   ========================================================================== */
+
+function updateMobileScale() {
+  const SCENE_WIDTH = 900;
+  const viewportWidth = window.innerWidth;
+  let scale = 1;
+  if (viewportWidth < SCENE_WIDTH) {
+    scale = viewportWidth / SCENE_WIDTH;
+  }
+  document.documentElement.style.setProperty('--mb-scale', scale);
+  const wrapper = document.getElementById('scene-wrapper');
+  if(wrapper) {
+    wrapper.style.marginBottom = (768 * scale - 768) + 'px';
+  }
+}
+window.addEventListener('resize', updateMobileScale);
+window.addEventListener('DOMContentLoaded', updateMobileScale);
+
+let gameActive = false;
+let mistoKonani = false; 
+let flipperCollected = false; 
+let trezorOpen = false;
+let safeDone = false;
+let isRotated = false;
+let calcInput = "";
+
+let totalSeconds = 154;
+let timerInterval = null;
+let fadeInterval = null;
+
+function playSound(id, loop = false, volume = 0.4) {
+  const audio = document.getElementById(id);
+  if (audio) {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = volume;
+    audio.loop = loop;
+    audio.play().catch(e => console.log("Audio waiting for user:", e));
+  }
+}
+
+function stopSound(id) {
+  const audio = document.getElementById(id);
+  if (audio) {
+    audio.pause();
+    audio.currentTime = 0;
+  }
+}
+
+function fadeOutSound(id, durationMs) {
+  const audio = document.getElementById(id);
+  if (!audio || audio.paused) return;
+
+  clearInterval(fadeInterval);
+  const startVolume = audio.volume;
+  const fadeSteps = 20; 
+  const stepTime = durationMs / fadeSteps;
+  let currentStep = 0;
+
+  fadeInterval = setInterval(() => {
+    currentStep++;
+    let newVolume = startVolume * (1 - (currentStep / fadeSteps));
+    if (newVolume <= 0) {
+      newVolume = 0;
+      audio.pause();
+      clearInterval(fadeInterval);
+    }
+    audio.volume = newVolume;
+  }, stepTime);
+}
+
+function closeText1() {
+  document.getElementById('text1').style.display = 'none';
+  startSceneGameplay();
+}
+
+function startSceneGameplay() {
+  gameActive = true;
+  const timerEl = document.getElementById('timer');
+  timerEl.style.display = 'block';
+  updateTimerDisplay();
+  
+  playSound('sound-time', false, 0.4);
+  
+  timerInterval = setInterval(() => {
+    totalSeconds--;
+    updateTimerDisplay();
+    
+    if (totalSeconds <= 0) {
+      clearInterval(timerInterval);
+      triggerFailState();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  document.getElementById('timer').textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
+
+function clickPlakatek() {
+  if (!gameActive && flipperCollected === false) return; 
+  document.getElementById('img-plakatek-dtl').style.display = 'block';
+}
+
+function closePlakatekDtl() {
+  document.getElementById('img-plakatek-dtl').style.display = 'none';
+  
+  // Vždy nejprve zobrazíme pouze text3 (popis plakátku)
+  document.getElementById('text3').style.display = 'block';
+  mistoKonani = true;
+}
+
+/* Oprava překrývání: text5 se vyhodnotí až ve chvíli, kdy hráč kliknutím zavře text3 */
+function closeText3Bubble() {
+  document.getElementById('text3').style.display = 'none';
+
+  // Teprve teď zkontrolujeme, zda už máme splněné obě podmínky (Plakátek + Flipper)
+  if (flipperCollected && gameActive === false) {
+    triggerSceneConclusion();
+  }
+}
+
+function clickTrezor() {
+  if (!gameActive) return;
+  if (!trezorOpen) {
+    document.getElementById('text2').style.display = 'block';
+  }
+}
+
+function closeBubble(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function openCalcModal() {
+  if (!gameActive || safeDone) return;
+  document.getElementById('modal-safe-game').classList.add('visible');
+}
+
+function closeCalcModal() {
+  document.getElementById('modal-safe-game').classList.remove('visible');
+}
+
+function toggleCalcRotation() {
+  if (!gameActive) return;
+  isRotated = !isRotated;
+  const deg = isRotated ? 180 : 0;
+  document.getElementById('calc-rotator-wrapper').style.transform = `rotate(${deg}deg)`;
+}
+
+function pressCalcKey(key) {
+  if (!gameActive) return;
+  playSound('sound-kalk', false, 1.0);
+  
+  if (key === 'C') {
+    calcInput = "";
+    renderDisplay();
+    return;
+  }
+  
+  if (calcInput.length < 6) {
+    calcInput += key;
+    renderDisplay();
+  }
+  
+  if (calcInput.length === 6) {
+    if (calcInput === "0.7538") {
+      triggerSafeSuccess();
+    } else {
+      setTimeout(() => {
+        playSound('sound-safe-fail', false, 0.4);
+        calcInput = "";
+        renderDisplay();
+      }, 250);
+    }
+  }
+}
+
+function renderDisplay() {
+  const displayContainer = document.getElementById('calc-display-text');
+  displayContainer.innerHTML = "";
+  for (let i = calcInput.length - 1; i >= 0; i--) {
+    const charSpan = document.createElement('span');
+    charSpan.className = 'display-char';
+    charSpan.textContent = calcInput[i];
+    displayContainer.appendChild(charSpan);
+  }
+}
+
+function triggerSafeSuccess() {
+  safeDone = true;
+  trezorOpen = true;
+  
+  playSound('sound-safe-open', false, 0.4);
+  
+  document.getElementById('img-trezor').style.display = 'none';
+  document.getElementById('img-trezor-open').style.display = 'block';
+  document.getElementById('img-flipper-sml').style.display = 'block';
+  
+  setTimeout(() => {
+    closeCalcModal();
+  }, 2000);
+}
+
+function clickFlipper() {
+  if (!gameActive || !safeDone) return;
+  
+  document.getElementById('img-flipper-sml').style.display = 'none';
+  
+  clearInterval(timerInterval);
+  fadeOutSound('sound-time', 1000);
+  
+  flipperCollected = true;
+  addFlipperToInventory();
+  
+  document.getElementById('text4').style.display = 'block';
+}
+
+function addFlipperToInventory() {
+  const inv = document.getElementById('inventory');
+  const newItm = document.createElement('img');
+  newItm.className = 'inv-item';
+  newItm.src = 'flipper-icon.png';
+  newItm.alt = 'Flipper';
+  newItm.onclick = function() { showItemText('flipper'); };
+  inv.appendChild(newItm);
+}
+
+function closeText4() {
+  document.getElementById('text4').style.display = 'none';
+  gameActive = false; // Zastavíme herní režim prohledávání scény
+  
+  // Zkontrolujeme, zda už byl prozkoumán plakátek
+  if (mistoKonani) {
+    triggerSceneConclusion();
+  }
+}
+
+function triggerSceneConclusion() {
+  document.getElementById('text5').style.display = 'block';
+}
+
+function closeText5() {
+  document.getElementById('text5').style.display = 'none';
+  document.getElementById('btn-pokracovat').style.display = 'block';
+}
+
+function triggerFailState() {
+  gameActive = false;
+  clearInterval(timerInterval);
+  
+  fadeOutSound('sound-time', 800);
+  closeCalcModal();
+
+  const exposedAudio = document.getElementById('sound-exposed');
+  playSound('sound-exposed', false, 0.4);
+
+  exposedAudio.onended = function() {
+    document.getElementById('img-exposed').style.display = 'block';
+  };
+}
+
+function clickExposed() {
+  document.getElementById('img-exposed').style.display = 'none';
+  
+  const whiteOverlay = document.getElementById('white-overlay');
+  whiteOverlay.style.display = 'block';
+  
+  setTimeout(() => {
+    whiteOverlay.style.opacity = '1';
+  }, 20);
+
+  playSound('sound-flashbang', false, 0.4);
+
+  const flashbangAudio = document.getElementById('sound-flashbang');
+  flashbangAudio.onended = function() {
+    whiteOverlay.style.display = 'none';
+    whiteOverlay.style.opacity = '0';
+    
+    document.getElementById('img-busted').style.display = 'block';
+    playSound('sound-wasted', false, 0.4);
+  };
+}
+
+function restartPanel() {
+  document.getElementById('img-busted').style.display = 'none';
+  
+  const kolimbus = document.getElementById('img-kolimbus');
+  kolimbus.classList.add('respawn-animation');
+  
+  totalSeconds = 154;
+  mistoKonani = false;
+  flipperCollected = false;
+  trezorOpen = false;
+  safeDone = false;
+  isRotated = false;
+  calcInput = "";
+  renderDisplay();
+  
+  document.getElementById('img-trezor').style.display = 'block';
+  document.getElementById('img-trezor-open').style.display = 'none';
+  document.getElementById('img-flipper-sml').style.display = 'none';
+  document.getElementById('calc-rotator-wrapper').style.transform = 'rotate(0deg)';
+  
+  const invItems = document.querySelectorAll('#inventory .inv-item');
+  invItems.forEach(item => {
+    if(item.src.includes('flipper-icon.png')) item.remove();
+  });
+
+  setTimeout(() => {
+    kolimbus.classList.remove('respawn-animation');
+    document.getElementById('text1').style.display = 'block';
+  }, 600);
+}
+
+const itemTexts = {
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+  'flipper': "Malá krabička umožňující ovládat různá zařízení z dálky."
+};
+
+function showItemText(key) {
+  if (!gameActive && safeDone === false && flipperCollected === false) return;
+  document.getElementById('item-description-text').innerText = itemTexts[key] || '';
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

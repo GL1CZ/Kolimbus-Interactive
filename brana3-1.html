@@ -462,6 +462,9 @@ let isDrawing = false;
 let lastX = 0, lastY = 0;
 let textPixels = [];
 
+// Proměnné pro mobilní záložní mechanismus (dvojí ťuknutí s delší prodlevou)
+let lastTouchTime = 0;
+
 function startPasswordMinigame() {
   phase = "minigame";
   document.getElementById('modal-password-game').classList.add('visible');
@@ -511,7 +514,7 @@ function getMousePos(e) {
 
 function getTouchPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const touch = e.touches[0];
+  const touch = e.targetTouches[0];
   return {
     x: touch.clientX - rect.left,
     y: touch.clientY - rect.top
@@ -540,9 +543,24 @@ canvas.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', () => { isDrawing = false; });
 
-/* --- PŘIDANÉ DOTYKOVÉ UDÁLOSTI PRO MOBIL --- */
+/* --- DOTYKOVÉ UDÁLOSTI PRO MOBIL + ZÁLOŽNÍ MECHANISMUS --- */
 canvas.addEventListener('touchstart', (e) => {
   if (phase !== "minigame") return;
+  
+  // Kontrola pro záložní mechanismus na mobilu: dvojí ťuknutí s prodlevou (400ms - 1500ms)
+  const currentTime = new Date().getTime();
+  const timeDiff = currentTime - lastTouchTime;
+  if (timeDiff > 400 && timeDiff < 1500) {
+    // Automatické splnění minihry
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    isDrawing = false;
+    handlePasswordRevealed();
+    e.preventDefault();
+    return;
+  }
+  lastTouchTime = currentTime;
+
   isDrawing = true;
   const pos = getTouchPos(e);
   lastX = pos.x; lastY = pos.y;

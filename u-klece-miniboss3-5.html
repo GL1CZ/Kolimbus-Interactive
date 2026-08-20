@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Souboj s minibossem</title>
+<style>
+  /* ====================================================================
+     KOLIMBUS - PANEL "SOUBOJ S MINIBOSSEM"
+     ====================================================================
+     Tento panel navazuje na scénu "U klece" a obsahuje:
+       1) Zahajovací sekvenci (odhalení scény, healthbary, intro bubliny)
+       2) Souboj - minihru "Kombostop" (easter egg na TV pořad Videostop)
+       3) Aktivaci Ashe (po vyčerpání zdraví Kolimbuse)
+       4) Volání Bureše (závěrečná sekvence)
+       5) Závěr (tlačítko Pokračovat)
+
+     Rozlišení panelu: 1400x768px (pevné souřadnice scény).
+     Na mobilu (portrait) se celý #game-container zmenší pomocí CSS
+     transform: scale(), aby se vlezl na šířku displeje - SOUŘADNICE
+     PRVKŮ UVNITŘ SCÉNY SE PŘITOM NEMĚNÍ, scaluje se celý kontejner.
+     ==================================================================== */
+
+  /* Import herních fontů - stejné jako v u-klece2-2.html pro konzistentní styl */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    background: #111;
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow-x: hidden;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  /* ---- WRAPPER PRO MOBILNÍ SCALE ----
+     Na desktopu se nic neděje (scale 1). Na mobilu JS spočítá scale faktor
+     tak, aby šířka 1400px sedla na šířku displeje, a nastaví ho jako
+     CSS proměnnou --mb-scale na tomto wrapperu. Díky transform-origin
+     top center se kontejner zmenší a zarovná nahoru, beze změny
+     souřadnic prvků uvnitř (ty zůstávají v "logických" 1400x768px). */
+  #scene-wrapper {
+    position: relative;
+    width: 1400px;
+    height: 768px;
+    transform: scale(var(--mb-scale, 1));
+    transform-origin: top center;
+  }
+
+  /* Hlavní herní kontejner s pevným rozlišením 1400x768px */
+  #game-container {
+    width: 1400px;
+    height: 768px;
+    background-image: url('klec-bkg.jpg'); /* Pozadí scény */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  /* ---- OBECNÉ HERNÍ ASSETY (postavy, dárek, atd.) ---- */
+  .game-asset {
+    position: absolute;
+    display: block;
+    user-select: none;
+  }
+
+  /* Postava Turer (vlevo) - výchozí pozice dle dokumentace */
+  #asset-turer {
+    left: 170px; top: 210px;
+    z-index: 5;
+    transition: left 0.45s cubic-bezier(.4,0,.2,1), top 0.45s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* Dárek - na začátku neaktivní (nelze kliknout), aktivuje se ve fázi "Volání Bureše" */
+  #asset-darek {
+    left: 461px; top: 574px;
+    z-index: 4;
+    cursor: default;
+    pointer-events: none;
+  }
+  #asset-darek.active {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  /* Nacinka - prostřední postava, přepíná se mezi verzí 1 a 2 */
+  #asset-nacinka1 {
+    left: 590px; top: 174px;
+    z-index: 3;
+  }
+  #asset-nacinka2 {
+    left: 590px; top: 174px;
+    z-index: 3;
+    display: none;
+  }
+
+  /* Kolimbus - postava vpravo, tři varianty (běžná, fáze Ash, finální opilá animace) */
+  #asset-kolimbus1 {
+    left: 1032px; top: 213px;
+    z-index: 5;
+    transition: left 0.45s cubic-bezier(.4,0,.2,1), top 0.45s cubic-bezier(.4,0,.2,1);
+  }
+  #asset-kolimbus2 {
+    left: 1020px; top: 375px;
+    z-index: 5;
+    display: none;
+    transition: top 1.2s ease;
+  }
+  #asset-kolimbus3 {
+    left: 1032px; top: 213px;
+    z-index: 5;
+    display: none;
+  }
+
+  /* Ash a portál - objevují se při aktivaci */
+  #asset-portal {
+    left: 607px; top: 163px;
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+  }
+  #asset-ash {
+    left: 598px; top: 183px;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+  }
+
+  /* Efekt "zásahu" - probliknutí bílou barvou přes brightness/saturate */
+  .hit-flash {
+    animation: hitFlash 0.4s ease;
+  }
+  @keyframes hitFlash {
+    0%   { filter: brightness(1)   saturate(1); }
+    25%  { filter: brightness(2.8) saturate(0); }
+    50%  { filter: brightness(1)   saturate(1); }
+    75%  { filter: brightness(2.8) saturate(0); }
+    100% { filter: brightness(1)   saturate(1); }
+  }
+
+  /* Blikání Ash (3x) před zmizením */
+  .ash-blink {
+    animation: ashBlink 0.5s steps(1) 3;
+  }
+  @keyframes ashBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Rychlé blikání healthbaru Kolimbuse na 5% (zelená/bílá) */
+  .health-critical-blink {
+    animation: healthBlink 0.4s steps(1) infinite;
+  }
+  @keyframes healthBlink {
+    0%, 100% { background: #24cc39; }
+    50% { background: #fff; }
+  }
+
+  /* ---- ČERNÝ ZATMÍVACÍ OBDÉLNÍK NA ZAČÁTKU ---- */
+  #intro-blackout {
+    position: absolute;
+    inset: 0;
+    width: 1400px;
+    height: 768px;
+    background: #000;
+    z-index: 300;
+    opacity: 1;
+    transition: opacity 2.5s ease;
+  }
+
+  /* ---- TEXTOVÉ BUBLINY (univerzální pro celý panel) ---- */
+  .bubble {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 310;
+    transition: transform 0.1s;
+  }
+  .bubble:hover {
+    transform: scale(1.02);
+  }
+
+  /* ---- HEALTHBARY ----
+     Rámeček byl původně obrázek (ramecek-tur.png / ramecek-kol.png),
+     nyní je to čistý <div> s červeným pozadím a žlutým rámečkem (border),
+     zelený/červený pruh zdraví je samostatný <div> dle dokumentace,
+     nápis je obrázek (text-tur.png / text-kol.png) zobrazený NAD pruhem. */
+
+  /* Rámeček Turer: 145px -> 585px = 440px šířka, na pozici 143,70px.
+     Šířka prodloužena o 2px vpravo (444px), aby žlutý rámeček obsáhl
+     i pravý okraj zeleného pruhu při 100% zdraví. */
+  #ramecek-tur {
+    left: 143px; top: 70px;
+    width: 444px; height: 30px;
+    z-index: 20;
+    display: none;
+    background: #cc2424;
+    border: 2px solid #ffe000;
+    box-sizing: border-box;
+  }
+  /* Rámeček Kolimbus: 817,70px. Track healthbaru začíná až na 907px (90px
+     vlevo je rezervovaná "label" zóna pro nápis KOLIMBUS, viditelná v
+     originální grafice jako prázdná/neutrální plocha) - proto má rámeček
+     červené pozadí jen v pravé části od 907px dál, aby přesně navazoval
+     na healthbar-kol-track a při 100% zdraví nezůstávala vlevo červená
+     plocha navíc. */
+  #ramecek-kol {
+    left: 904px; top: 70px;
+    width: 356px; height: 30px;
+    z-index: 20;
+    display: none;
+    background: linear-gradient(to right, transparent 0px, transparent 88px, #cc2424 88px, #cc2424 100%);
+    border: 2px solid #ffe000;
+    box-sizing: border-box;
+  }
+
+  /* Trojnásobné probliknutí rámečků (100-0-100-0-100-0-100 opacity) */
+  @keyframes frameBlink {
+    0%   { opacity: 1; }
+    14%  { opacity: 0; }
+    28%  { opacity: 1; }
+    42%  { opacity: 0; }
+    57%  { opacity: 1; }
+    71%  { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  .frame-blink-anim {
+    animation: frameBlink 1.4s steps(1) 1;
+  }
+
+  /* Healthbar Turer: plná délka 440px (200 bodů zdraví), pozice 145,72px */
+  #healthbar-tur-track {
+    position: absolute;
+    left: 145px; top: 72px;
+    width: 440px;
+    height: 26px;
+    z-index: 21;
+    overflow: hidden;
+    display: none;
+  }
+  /* Zelený pruh Türera je kotven k LEVÉMU okraji rámečku (145px) a při ubírání
+     zdraví se zmenšuje jeho šířka - tím se "ukrajuje" z jeho PRAVÉHO konce,
+     tedy směrem ke středu rámečku (585px), přesně jak popisuje dokumentace
+     ("zkrácení zeleného pruhu od středusměrem doleva"). */
+  #healthbar-tur-fill {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+    height: 100%;
+    background: #24cc39; /* zelená */
+  }
+
+  /* Healthbar Kolimbus: track je zarovnán přesně na VNITŘEK žlutého rámečku
+     #ramecek-kol (rámeček: left 904px, width 356px, border 2px -> vnitřek
+     906px až 1258px). Track má tedy left:906px, width:352px, aby zelená
+     výplň při 100 % zdraví sahala přesně ke žlutému okraji a nezůstával
+     viditelný žádný zbytek červené navíc. */
+  #healthbar-kol-track {
+    position: absolute;
+    left: 906px; top: 72px;
+    width: 352px;
+    height: 26px;
+    background: #cc2424; /* červená - viditelná v místech, kde zelená nesahá */
+    z-index: 21;
+    overflow: hidden;
+    display: none;
+  }
+  /* Zelená vrstva - kotvena k pravému okraji tracku, posunuta o 2px doprava.
+     top: 1px (posunuto o 2px nahoru oproti původním 3px), height: 25px
+     (track má výšku 26px, takže 1px + 25px = 26px = přesně do dolního
+     okraje tracku, beze přesahu). */
+  #healthbar-kol-green {
+    position: absolute;
+    right: 1px; top: 1px;
+    width: 0%; /* výchozí 0% - dokud JS nenastaví reálnou hodnotu (80%),
+                  je celá track plocha červená (vidět při úvodním blikání) */
+    height: 26px;
+    background: #24cc39;
+  }
+  /* Plynulé plnění healthbaru Kolimbuse po vypití slivovice - aplikuje se
+     jen na dobu trvání zvuku hard.mp3 (4s), aby pruh rostl synchronně se
+     zvukem. Mimo tuto sekvenci zůstává width nastavován okamžitě (beze
+     změny), aby se neopozdilo "ukrajování" zdraví při zásahu. */
+  #healthbar-kol-green.health-fill-anim {
+    transition: width 4s linear;
+  }
+
+  /* Nápisy nad zeleným pruhem - obrázky text-tur.png / text-kol.png */
+  #text-tur {
+    left: 160px; top: 67px;
+    z-index: 22;
+    display: none;
+  }
+  #text-kol {
+    left: 1080px; top: 72px;
+    z-index: 22;
+    display: none;
+  }
+
+  /* ---- MODÁLNÍ OKNO MINIHRY "KOMBOSTOP" ---- */
+  #modal-kombostop {
+    position: absolute;
+    inset: 0;
+    width: 1400px;
+    height: 768px;
+    background: rgba(0,0,0,0.35);
+    z-index: 400;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.35s ease;
+  }
+  #modal-kombostop.hide-temp {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Pozadí minihry - rozměry přesně dle obrázku kombostop-bkg.png: 530x461px */
+  #kombostop-container {
+    width: 530px;
+    height: 461px;
+    background-image: url('kombostop-bkg.png');
+    background-size: cover;
+    position: relative;
+    user-select: none;
+  }
+
+  /* Digitální displej skóre "0000" - vlevo nahoře v panelu */
+  #kombostop-score {
+    position: absolute;
+    left: 60px; top: 70px;
+    width: 175px;
+    height: 65px;
+    background: #1c2230;
+    border: 3px solid #0a0e16;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    font-size: 46px;
+    letter-spacing: 4px;
+    color: #e8e8e8;
+    text-shadow: 0 0 8px rgba(255,255,255,0.5);
+  }
+
+  /* Digitální displej "počet pokusů do vyčeprání životů" soupeře */
+  #kombostop-attempts {
+    position: absolute;
+    left: 250px; top: 78px;
+    width: 70px;
+    height: 50px;
+    background: #9fb8c7;
+    border: 3px solid #5d6d76;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    font-size: 36px;
+    color: #1c2230;
+  }
+
+  /* Vertikální nápis "KOMBOSTOP" vpravo */
+  #kombostop-label {
+    position: absolute;
+    left: 385px; top: 60px;
+    width: 70px;
+    height: 290px;
+    background: #6b3a35;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-family: 'VT323', monospace;
+    font-size: 26px;
+    letter-spacing: 6px;
+    color: #f0e0c0;
+    font-weight: bold;
+  }
+
+  /* Pole kostek */
+  #kombostop-dice-area {
+    position: absolute;
+    left: 60px; top: 150px;
+    width: 260px;
+    height: 100px;
+    border: 2px solid #1c2230;
+    background: rgba(0,0,0,0.08);
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .kombostop-die {
+    width: 78px;
+    height: 88px;
+    background: #8fa9b3;
+    border: 2px solid #44545c;
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+  }
+  .kombostop-die.frozen {
+    box-shadow: 0 0 0 3px #ffcc00 inset;
+  }
+
+  /* Stav "okénka" před spuštěním hry - žluto-hnědý kostkovaný vzor (placeholder) */
+  .kombostop-die.placeholder {
+    background-image:
+      repeating-conic-gradient(#8a7a2c 0% 25%, #5c4f1d 0% 50%);
+    background-size: 20px 20px;
+  }
+
+  /* Tečky na kostce - mřížka 3x3, stejně jako ve skutečné kostce */
+  .die-pip-grid {
+    position: absolute;
+    inset: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+  }
+  .die-pip {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #1c2230;
+    align-self: center;
+    justify-self: center;
+    opacity: 0;
+  }
+  /* Pozice teček v 3x3 mřížce (indexy 0-8, čteno po řádcích) */
+  .pip-0 { grid-area: 1 / 1; } .pip-1 { grid-area: 1 / 2; } .pip-2 { grid-area: 1 / 3; }
+  .pip-3 { grid-area: 2 / 1; } .pip-4 { grid-area: 2 / 2; } .pip-5 { grid-area: 2 / 3; }
+  .pip-6 { grid-area: 3 / 1; } .pip-7 { grid-area: 3 / 2; } .pip-8 { grid-area: 3 / 3; }
+
+  #kombostop-attack-label {
+    position: absolute;
+    left: 60px; top: 268px;
+    font-family: 'VT323', monospace;
+    font-size: 30px;
+    letter-spacing: 2px;
+    color: #1c2230;
+    font-weight: bold;
+  }
+
+  /* Tlačítko HRÁT - po prvním stisku se hra spustí, dalšími kliky se kostky zmrazí */
+  #btn-kombostop-hrat {
+    position: absolute;
+    left: 175px; top: 388px;
+    width: 180px;
+    height: 50px;
+    background: #2d5c52;
+    border: 3px solid #1c2230;
+    border-radius: 8px;
+    color: #f0e0c0;
+    font-family: 'VT323', monospace;
+    font-size: 26px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #btn-kombostop-hrat:active {
+    background: #234940;
+  }
+  #btn-kombostop-hrat:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* ---- MODÁLNÍ OKNO PRO RYCHLOST TICKU (volitelné nastavení, dle dokumentace
+     "udělej rychlost ticku nastavitelnou") - drobný ovládací prvek v rohu scény ---- */
+  #tick-speed-control {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    z-index: 450;
+    background: rgba(20,20,20,0.55);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+  }
+  #tick-speed-control input {
+    width: 90px;
+  }
+
+  /* ---- TLAČÍTKO POKRAČOVAT (závěr panelu) ---- */
+  #btn-final-continue {
+    display: none;
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    background: #00cc44;
+    color: #fff;
+    border: none;
+    padding: 15px 35px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    z-index: 520;
+    text-transform: uppercase;
+    animation: pulse 1.5s infinite;
+  }
+  #btn-final-continue:hover {
+    background: #00ee55;
+  }
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50% { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  /* ---- INVENTÁŘ ----
+     Zkopírováno z u-klece2-2.html. Na začátku zcela neviditelný (display:none),
+     zobrazí se až ve fázi "Aktivace Ashe" a znovu ve fázi "Volání Bureše". */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: none;
+    gap: 12px;
+    z-index: 350;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  #inventory.visible {
+    display: flex;
+  }
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+  .inv-item.inv-hidden {
+    display: none;
+  }
+
+  /* ====================================================================
+     RESPONZIVNÍ ÚPRAVA PRO MOBIL (portrait)
+     Souřadnice prvků UVNITŘ #game-container se nikdy nemění - scaluje
+     se celý #scene-wrapper pomocí CSS transformace (viz JS níže),
+     která dopočítá faktor zmenšení podle šířky displeje.
+     ==================================================================== */
+  @media (max-width: 1400px) {
+    body { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-wrapper">
+  <div id="game-container">
+
+    <img id="asset-turer"     class="game-asset" src="Turer.png"     alt="Filip Türer">
+    <img id="asset-darek"     class="game-asset" src="darek.png"     alt="Dárek" onclick="clickDarek()">
+    <img id="asset-nacinka1"  class="game-asset" src="Nacinka1.png"  alt="Náčinka">
+    <img id="asset-nacinka2"  class="game-asset" src="Nacinka2.png"  alt="Náčinka" style="display:none;">
+    <img id="asset-kolimbus1" class="game-asset" src="Kolimbus1.png" alt="Kolimbus">
+    <img id="asset-kolimbus2" class="game-asset" src="Kolimbus2.png" alt="Kolimbus">
+    <img id="asset-kolimbus3" class="game-asset" src="Kolimbus3.png" alt="Kolimbus">
+
+    <img id="asset-portal" class="game-asset" src="portal.png" alt="Portál">
+    <img id="asset-ash"    class="game-asset" src="Ash.png"    alt="Ash">
+
+    <div id="ramecek-tur" class="game-asset"></div>
+    <div id="ramecek-kol" class="game-asset"></div>
+
+    <div id="healthbar-tur-track">
+      <div id="healthbar-tur-fill"></div>
+    </div>
+    <div id="healthbar-kol-track">
+      <div id="healthbar-kol-green"></div>
+    </div>
+
+    <img id="text-tur" class="game-asset" src="text-tur.png" alt="Filip Türer">
+    <img id="text-kol" class="game-asset" src="text-kol.png" alt="Kolimbus">
+
+    <div id="inventory">
+      <img class="inv-item" src="groovie-icon.png" alt="Groovie" onclick="clickInventoryItem('groovie')">
+      <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+      <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+      <img class="inv-item" src="500-icon.png" alt="500" onclick="showItemText('500')">
+      <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+      <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+      <img class="inv-item" id="slivovice-icon" src="slivovice-icon.png" alt="Slivovice" onclick="clickInventoryItem('slivovice')">
+    </div>
+
+    <img id="active-bubble" class="bubble" src="" alt="Textová bublina" onclick="closeBubble()">
+
+    <div id="intro-blackout"></div>
+
+    <div id="modal-kombostop">
+      <div id="kombostop-container">
+
+        <div id="kombostop-score">0000</div>
+        <div id="kombostop-attempts">05</div>
+        <div id="kombostop-label">KOMBOSTOP</div>
+
+        <div id="kombostop-dice-area">
+          <div class="kombostop-die placeholder" id="die-0"></div>
+          <div class="kombostop-die placeholder" id="die-1"></div>
+          <div class="kombostop-die placeholder" id="die-2"></div>
+        </div>
+        <div id="kombostop-attack-label">ÚTOK</div>
+
+        <button id="btn-kombostop-hrat" onclick="handleHratClick()">HRÁT</button>
+      </div>
+    </div>
+
+    <button id="btn-final-continue" onclick="window.location.href='recepce2-3.html'">Pokračovat</button>
+
+  </div>
+</div>
+
+<div id="modal-item-text" class="modal-overlay-item" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #ffcc00; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4;">Text předmětu...</p>
+    <button onclick="closeItemModal()" style="background:#ffcc00; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<audio id="audio-bgm" src="calm-night.mp3" loop></audio>
+<audio id="audio-mk1" src="MK1.mp3" loop></audio>
+<audio id="sfx-voda" src="voda.mp3"></audio>
+<audio id="sfx-tick" src="tick.mp3"></audio>
+<audio id="sfx-spravne" src="spravne.mp3"></audio>
+<audio id="sfx-spatne" src="spatne.mp3"></audio>
+<audio id="sfx-woosh1" src="woosh1.mp3"></audio>
+<audio id="sfx-woosh2" src="woosh2.mp3"></audio>
+<audio id="sfx-hit1" src="hit1.mp3"></audio>
+<audio id="sfx-hit2" src="hit2.mp3"></audio>
+<audio id="sfx-au1" src="au1.mp3"></audio>
+<audio id="sfx-au2" src="au2.mp3"></audio>
+<audio id="sfx-drop" src="drop.mp3"></audio>
+<audio id="sfx-portal" src="portal.mp3"></audio>
+<audio id="sfx-vola-bures" src="vola-bures.mp3"></audio>
+<audio id="sfx-kroky-branka" src="kroky-branka.mp3"></audio>
+<audio id="sfx-gulping" src="gulping.mp3"></audio>
+<audio id="sfx-hard" src="hard.mp3"></audio>
+
+<script>
+/* ==========================================================================
+   KOLIMBUS - PANEL "SOUBOJ S MINIBOSSEM"
+   Hlavní herní logika. Komentováno po sekcích dle struktury dokumentace.
+   ========================================================================== */
+
+/* ---- RESPONZIVNÍ SCALE PRO MOBIL (portrait) ----
+   Logická scéna má vždy 1400x768px. Na mobilu kontejner zmenšíme
+   pomocí CSS proměnné --mb-scale tak, aby šířka 1400px odpovídala
+   šířce displeje. Souřadnice jednotlivých prvků v rámci scény se tím
+   NEMĚNÍ - jen se celá scéna i s prvky zmenší jako jeden celek. */
+function updateMobileScale() {
+  const SCENE_WIDTH = 1400;
+  const viewportWidth = window.innerWidth;
+  let scale = 1;
+  if (viewportWidth < SCENE_WIDTH) {
+    scale = viewportWidth / SCENE_WIDTH;
+  }
+  document.documentElement.style.setProperty('--mb-scale', scale);
+
+  // Výška wrapperu po scale musí odpovídat dostupnému místu, aby stránka
+  // nezůstávala s prázdným prostorem pod scénou.
+  const wrapper = document.getElementById('scene-wrapper');
+  wrapper.style.marginBottom = (768 * scale - 768) + 'px';
+}
+window.addEventListener('resize', updateMobileScale);
+window.addEventListener('DOMContentLoaded', updateMobileScale);
+
+/* ---- POMOCNÉ FUNKCE PRO PŘEHRÁVÁNÍ ZVUKU ---- */
+function playSFX(elementId, volume = 1, loop = false) {
+  const sfx = document.getElementById(elementId);
+  if (!sfx) return null;
+  sfx.loop = loop;
+  if (!loop) sfx.currentTime = 0;
+  sfx.volume = volume;
+  sfx.play().catch(e => console.log('Audio waiting for interaction:', elementId));
+  return sfx;
+}
+function stopSFX(elementId) {
+  const sfx = document.getElementById(elementId);
+  if (sfx) { sfx.pause(); sfx.currentTime = 0; }
+}
+/* Postupné stlumení hlasitosti na 0 (pro přechod MK1.mp3 -> calm-night.mp3) */
+function fadeOutSFX(elementId, durationMs, callback) {
+  const sfx = document.getElementById(elementId);
+  if (!sfx) { if (callback) callback(); return; }
+  const steps = 20;
+  const stepTime = durationMs / steps;
+  const startVolume = sfx.volume;
+  let i = 0;
+  const fadeInterval = setInterval(() => {
+    i++;
+    sfx.volume = Math.max(0, startVolume * (1 - i / steps));
+    if (i >= steps) {
+      clearInterval(fadeInterval);
+      stopSFX(elementId);
+      sfx.volume = startVolume; // reset pro případné další přehrání
+      if (callback) callback();
+    }
+  }, stepTime);
+}
+
+/* ==========================================================================
+   1) ZAHAJOVACÍ SEKVENCE
+   ========================================================================== */
+
+// Hudba na pozadí se aktivuje při prvním kliknutí (kvůli autoplay politice prohlížečů)
+let bgmStarted = false;
+document.addEventListener('click', function initBGM() {
+  if (bgmStarted) return;
+  bgmStarted = true;
+  const bgm = document.getElementById('audio-bgm');
+  bgm.volume = 0.5; // 40% dle dokumentace
+  bgm.play().catch(e => console.log('BGM waiting for interaction.'));
+}, { once: false });
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Spuštění úvodní bubliny "text1-mb.png" nad černým obdélníkem
+  showBubble('text1-mb.png', 311, 70, 'intro1');
+});
+
+// Stav úvodního dialogu - řídí, co se stane po zavření aktuální bubliny
+let introState = 'intro1';
+
+function showBubble(imgSrc, x, y, nextState) {
+  const bubble = document.getElementById('active-bubble');
+  bubble.src = imgSrc;
+  bubble.style.left = `${x}px`;
+  bubble.style.top = `${y}px`;
+  bubble.style.display = 'block';
+  introState = nextState;
+}
+
+function closeBubble() {
+  const bubble = document.getElementById('active-bubble');
+  bubble.style.display = 'none';
+
+  switch (introState) {
+    case 'intro1':
+      // Po zmizení první bubliny: přehrát "voda.mp3", po jeho skončení
+      // černý obdélník pomalu zmizí (opacity 100 -> 0%).
+      const voda = document.getElementById('sfx-voda');
+      playSFX('sfx-voda', 1);
+      voda.addEventListener('ended', revealScene, { once: true });
+      introState = 'waiting_voda';
+      break;
+
+    case 'text2': showBubble('text3-mb.png', 429, 44, 'text3'); break;
+    case 'text3': showBubble('text4-mb.png', 317, 96, 'text4'); break;
+    case 'text4': showBubble('text5-mb.png', 325, 43, 'text5'); break;
+    case 'text5':
+      // Po text5-mb.png následuje rovnou probliknutí healthbarů
+      // (druhé zobrazení text3-mb.png v dokumentaci byla copy-paste chyba)
+      revealHealthbars();
+      break;
+
+    case 'text6':
+      // Po zmizení text6-mb.png se spustí minihra souboje
+      stopSFX('audio-bgm');
+      const mk1 = document.getElementById('audio-mk1');
+      mk1.volume = 0.5;
+      mk1.play().catch(e => console.log('MK1 waiting for interaction.'));
+      startKombostopRound();
+      break;
+
+    case 'text13':
+      // Po Aktivaci Ashe - krok 1 (zobrazení textu po skoku Kolimbuse2)
+      showInventoryForAsh();
+      break;
+
+    case 'text14':
+      // Po zobrazení text14-mb.png následuje útok Türera na Ash
+      runAshDefeatSequence();
+      break;
+
+    case 'text7':
+      // "Volání Bureše" - krok 1
+      runCallBuresStep2();
+      break;
+
+    case 'text8':
+      // Po text8-mb.png zmizí healthbar/rámeček Türera a Náčinka1 -> Náčinka2
+      // Pokud uživatel klikl dřív, než doběhlo přehrávání vola-bures.mp3, zvuk zastavíme.
+      stopSFX('sfx-vola-bures');
+      removeTurerHealthbar();
+      break;
+
+    case 'text9':
+      // Po text9-mb.png zmizí postavy Turer a Nacinka2, zazní kroky-branka.mp3
+      runFootstepsStep();
+      break;
+
+    case 'text10':
+      // Po text10-mb.png se znovu objeví inventář (pro slivovici)
+      showInventoryForSlivovice();
+      break;
+
+    case 'text11':
+      // Po text11-mb.png dárek se stává aktivním (klikatelným)
+      activateDarek();
+      break;
+
+    case 'text12':
+      // Po text12-mb.png (reakce na dárek) se nově zobrazí text15-mb.png na stejné pozici
+      showBubble('text15-mb.png', 708, 172, 'text15');
+      break;
+
+    case 'text15':
+      // Po text15-mb.png se teprve zobrazí tlačítko Pokračovat
+      document.getElementById('btn-final-continue').style.display = 'block';
+      break;
+
+    default:
+      break;
+  }
+}
+
+/* Odhalení scény po zmizení černého obdélníku */
+function revealScene() {
+  const blackout = document.getElementById('intro-blackout');
+  blackout.style.opacity = '0';
+  setTimeout(() => {
+    blackout.style.display = 'none';
+    // Jakmile se scéna odhalí, objeví se další textová bublina
+    showBubble('text2-mb.png', 868, 112, 'text2');
+  }, 2000); // odpovídá CSS transition opacity 2.5s
+}
+
+/* Po sérii úvodních bublin se zobrazí rámečky healthbarů (3x probliknou)
+   a poté se naplní zelené pruhy + nápisy. */
+function revealHealthbars() {
+  const ramecekTur = document.getElementById('ramecek-tur');
+  const ramecekKol = document.getElementById('ramecek-kol');
+
+  ramecekTur.style.display = 'block';
+  ramecekKol.style.display = 'block';
+  ramecekTur.classList.add('frame-blink-anim');
+  ramecekKol.classList.add('frame-blink-anim');
+
+  // Animace probliknutí trvá 1.4s (viz CSS @keyframes frameBlink)
+  setTimeout(() => {
+    ramecekTur.classList.remove('frame-blink-anim');
+    ramecekKol.classList.remove('frame-blink-anim');
+
+    // Zobrazení healthbarů (zelené/červené pruhy) na plné hodnotě
+    document.getElementById('healthbar-tur-track').style.display = 'block';
+    document.getElementById('healthbar-kol-track').style.display = 'block';
+    resetHealthbars();
+
+    // Nápisy nad pruhy
+    document.getElementById('text-tur').style.display = 'block';
+    document.getElementById('text-kol').style.display = 'block';
+
+    // Poslední krok úvodu - bublina text6-mb.png, po jejím zavření start minihry
+    showBubble('text6-mb.png', 919, 175, 'text6');
+  }, 1400);
+}
+
+/* ==========================================================================
+   HEALTHBARY - správa hodnot zdraví
+   Turer:    max 200 bodů, plná délka pruhu = 100% z 440px.
+   Kolimbus: max 100 bodů, ale na startu má jen 80 bodů (= 80% z 351px).
+             Z toho 20% (= 20 bodů) je trvale "scestná" červená rezerva
+             vlevo od zelené - hráč vidí jen vizuální pruh, ne čísla.
+   ========================================================================== */
+let turerHealth = 200;      // max 200
+const turerMaxHealth = 200;
+let kolimbusHealth = 80;    // start na 80 (z max 100)
+const kolimbusMaxHealth = 100;
+
+function resetHealthbars() {
+  turerHealth = 200;
+  kolimbusHealth = 80;
+  updateTurerHealthbarUI();
+  updateKolimbusHealthbarUI();
+}
+
+function updateTurerHealthbarUI() {
+  const pct = Math.max(0, turerHealth / turerMaxHealth) * 100;
+  document.getElementById('healthbar-tur-fill').style.width = pct + '%';
+}
+function updateKolimbusHealthbarUI() {
+  const pct = Math.max(0, kolimbusHealth / kolimbusMaxHealth) * 100;
+  document.getElementById('healthbar-kol-green').style.width = pct + '%';
+}
+
+/* ==========================================================================
+   2) SOUBOJ - MINIHRA "KOMBOSTOP"
+   ========================================================================== */
+
+const TICK_SPEED_DEFAULT = 400; // ms, nastavitelná rychlost ticku
+let tickSpeed = TICK_SPEED_DEFAULT;
+
+let diceValues = [1, 1, 1];
+let diceFrozen = [false, false, false];
+let diceRollInterval = null;
+let kombostopRunning = false;   // true = kostky se právě "rolují"
+let kombostopAttemptsLeft = 5;  // 5 pokusů soupeře, než dojdou životy (20% za neúspěch)
+let kombostopScore = 0;
+
+/* Vykreslení teček na kostce podle hodnoty 1-6 (klasické rozložení) */
+const DIE_PIP_PATTERNS = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8]
+};
+
+function renderDie(index, value) {
+  const die = document.getElementById('die-' + index);
+  die.classList.remove('placeholder');
+  die.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'die-pip-grid';
+  for (let i = 0; i < 9; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'die-pip pip-' + i;
+    if (DIE_PIP_PATTERNS[value].includes(i)) {
+      pip.style.opacity = '1';
+    }
+    grid.appendChild(pip);
+  }
+  die.appendChild(grid);
+}
+
+function renderAllDicePlaceholders() {
+  for (let i = 0; i < 3; i++) {
+    const die = document.getElementById('die-' + i);
+    die.classList.add('placeholder');
+    die.innerHTML = '';
+    die.classList.remove('frozen');
+  }
+}
+
+/* Příprava nového kola.
+   - Dlaždice (placeholder vzor "okénka") se zobrazí POUZE při prvním kole
+     celé minihry - v dalších kolech zůstávají kostky od minulého tahu
+     zobrazené, dokud hráč nezmáčkne HRÁT znovu (start nového rolování).
+   - Skóre displeje se na začátku KAŽDÉHO kola resetuje na 0000. */
+let kombostopFirstRound = true;
+
+function startKombostopRound() {
+  document.getElementById('modal-kombostop').style.display = 'flex';
+
+  if (kombostopFirstRound) {
+    renderAllDicePlaceholders();
+    kombostopFirstRound = false;
+  } else {
+    // Kostky zůstávají zobrazené s hodnotami z předchozího kola (jen odemčené)
+    for (let i = 0; i < 3; i++) {
+      document.getElementById('die-' + i).classList.remove('frozen');
+    }
+  }
+
+  diceFrozen = [false, false, false];
+  kombostopRunning = false;
+
+  // Skóre se resetuje na začátku každého kola
+  kombostopScore = 0;
+  document.getElementById('kombostop-score').innerText =
+    String(kombostopScore).padStart(4, '0');
+
+  document.getElementById('kombostop-attempts').innerText =
+    String(kombostopAttemptsLeft).padStart(2, '0');
+
+  const btn = document.getElementById('btn-kombostop-hrat');
+  btn.innerText = 'HRÁT';
+  btn.disabled = false;
+}
+
+/* Klik na tlačítko HRÁT:
+   - Pokud kostky ještě nerotují -> spustí rotaci (skryje okénka, ukáže náhodné hodnoty).
+   - Pokud kostky už rotují -> zmrazí je na aktuálních hodnotách a vyhodnotí tah. */
+function handleHratClick() {
+  if (!kombostopRunning) {
+    beginDiceRolling();
+  } else {
+    freezeDiceAndEvaluate();
+  }
+}
+
+function beginDiceRolling() {
+  kombostopRunning = true;
+  // Inicializace náhodných hodnot při startu rolování
+  diceValues = [randomDieValue(), randomDieValue(), randomDieValue()];
+  for (let i = 0; i < 3; i++) renderDie(i, diceValues[i]);
+
+  diceRollInterval = setInterval(() => {
+    // V každém ticku se mohou měnit všechny tři, dvě, nebo jen jedna kostka
+    const howManyChange = Math.floor(Math.random() * 3) + 1; // 1,2 nebo 3
+    const indices = [0, 1, 2].sort(() => Math.random() - 0.5).slice(0, howManyChange);
+    indices.forEach(i => {
+      diceValues[i] = randomDieValue();
+      renderDie(i, diceValues[i]);
+    });
+    playSFX('sfx-tick', 0.5);
+  }, tickSpeed);
+}
+
+function randomDieValue() {
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+/* Zmrazení kostek na aktuálních hodnotách a vyhodnocení úspěchu/neúspěchu */
+function freezeDiceAndEvaluate() {
+  clearInterval(diceRollInterval);
+  diceRollInterval = null;
+  kombostopRunning = false;
+
+  for (let i = 0; i < 3; i++) {
+    document.getElementById('die-' + i).classList.add('frozen');
+  }
+
+  // Najdi nejpočetnější shodnou hodnotu mezi kostkami (2 nebo 3 stejné)
+  const counts = {};
+  diceValues.forEach(v => counts[v] = (counts[v] || 0) + 1);
+  let bestValue = null, bestCount = 0;
+  for (const v in counts) {
+    if (counts[v] > bestCount) { bestCount = counts[v]; bestValue = parseInt(v); }
+  }
+
+  const btn = document.getElementById('btn-kombostop-hrat');
+  btn.disabled = true;
+
+  if (bestCount >= 2) {
+    // ÚSPĚCH: počet zmražených kostek se stejnou hodnotou x jejich hodnota
+    const damage = bestCount * bestValue;
+    kombostopScore += damage;
+    document.getElementById('kombostop-score').innerText =
+      String(kombostopScore).padStart(4, '0');
+    playSFX('sfx-spravne', 0.5);
+    setTimeout(() => runSuccessHitSequence(damage), 500);
+  } else {
+    // NEÚSPĚCH: všechny tři kostky mají jinou hodnotu
+    playSFX('sfx-spatne', 0.5);
+    setTimeout(() => runFailHitSequence(), 500);
+  }
+}
+
+/* ---- ÚSPĚŠNÝ ZÁSAH ----
+   Hráč zmrazil 2 nebo 3 stejné kostky. Pravá postava (Kolimbus) se přesune
+   zprava doleva a udeří. Levá postava (Türer) bliká - ona je zasažená -
+   a JÍ se odečte zdraví spočítané ze zmražených kostek. */
+function runSuccessHitSequence(damage) {
+  const modal = document.getElementById('modal-kombostop');
+  modal.classList.add('hide-temp');
+
+  playSFX('sfx-woosh1', 0.5);
+
+  const kolimbus = document.getElementById('asset-kolimbus1');
+  const turer = document.getElementById('asset-turer');
+  const originalLeft = 1032, originalTop = 213;
+  const strikeLeft = 430, strikeTop = 204;
+
+  // Bézierův oblouk realizován přes dvoukrokový přechod (CSS transition se
+  // postará o plynulý pohyb; mírné "vykřivení" trajektorie simulujeme tak,
+  // že nejprve poskočí nahoru/doprostřed, než dosedne na cílovou pozici).
+  kolimbus.style.left = strikeLeft + 'px';
+  kolimbus.style.top = (strikeTop - 30) + 'px';
+
+  setTimeout(() => {
+    kolimbus.style.top = strikeTop + 'px';
+    playSFX('sfx-hit2', 0.6);
+
+    setTimeout(() => {
+      // Postava Kolimbus se posune o 10px doleva (dokončení údery)
+      kolimbus.style.left = (strikeLeft - 10) + 'px';
+      playSFX('sfx-au1', 0.5);
+
+      // Türer bíle blikne - on je tady zasaženou postavou
+      turer.classList.add('hit-flash');
+      setTimeout(() => turer.classList.remove('hit-flash'), 400);
+
+      // Odečtení zdraví Türerovi (podle zmražených kostek)
+      applyDamageToTurer(damage);
+
+      setTimeout(() => {
+        // Návrat Kolimbuse na výchozí pozici po stejném oblouku
+        kolimbus.style.left = (originalLeft) + 'px';
+        kolimbus.style.top = (originalTop - 30) + 'px';
+        setTimeout(() => {
+          kolimbus.style.top = originalTop + 'px';
+          finishCombatTurn();
+        }, 450);
+      }, 600);
+    }, 250);
+  }, 250);
+}
+
+/* Odečtení zdraví Türerovi: zkrácení zeleného pruhu o x bodů (x odpovídá
+   damage spočítaného ze zmražených kostek, max 18, min 2). Pokud Türerovo
+   zdraví klesne pod 30 %, spustí se jeho speciální dorážecí útok. */
+function applyDamageToTurer(damage) {
+  turerHealth = Math.max(0, turerHealth - damage);
+  updateTurerHealthbarUI();
+
+  if (turerHealth <= turerMaxHealth * 0.30 && turerHealth > 0) {
+    // Speciální dorážecí útok Türera - skok doprava ke Kolimbusovi,
+    // srazí Kolimbusovo zdraví na pouhých 5 %.
+    setTimeout(() => runTurerSpecialAttack(), 400);
+  }
+}
+
+/* ---- NEÚSPĚŠNÝ ZÁSAH ----
+   Hráč nezmrazil žádné dvě stejné kostky. Levá postava (Türer) se přesune
+   doprava a udeří. Pravá postava (Kolimbus) bliká - ona je zasažená -
+   a JÍ se odečte 20 % zdraví. */
+function runFailHitSequence() {
+  const modal = document.getElementById('modal-kombostop');
+  modal.classList.add('hide-temp');
+
+  playSFX('sfx-woosh2', 0.5);
+
+  const turer = document.getElementById('asset-turer');
+  const kolimbus = document.getElementById('asset-kolimbus1');
+  const originalLeft = 170, originalTop = 210;
+  const strikeLeft = 840, strikeTop = 204;
+
+  turer.style.left = strikeLeft + 'px';
+  turer.style.top = (strikeTop - 30) + 'px';
+
+  setTimeout(() => {
+    turer.style.top = strikeTop + 'px';
+    playSFX('sfx-hit1', 0.6);
+
+    setTimeout(() => {
+      turer.style.left = (strikeLeft + 10) + 'px';
+      playSFX('sfx-au2', 0.5);
+
+      // Kolimbus bíle blikne - on je tady zasaženou postavou
+      kolimbus.classList.add('hit-flash');
+      setTimeout(() => kolimbus.classList.remove('hit-flash'), 400);
+
+      applyDamageToKolimbus20Percent();
+
+      setTimeout(() => {
+        turer.style.left = originalLeft + 'px';
+        turer.style.top = (originalTop - 30) + 'px';
+        setTimeout(() => {
+          turer.style.top = originalTop + 'px';
+          finishCombatTurn();
+        }, 450);
+      }, 600);
+    }, 250);
+  }, 250);
+}
+
+/* Odečtení 20 % zdraví Kolimbusovi při neúspěchu hráče. Pokud by mu tím
+   hrozilo, že klesne na 0 % nebo méně, místo skutečného zničení se mu
+   zdraví rozbliká na 5 % a spustí se Aktivace Ashe. */
+function applyDamageToKolimbus20Percent() {
+  kombostopAttemptsLeft--;
+  document.getElementById('kombostop-attempts').innerText =
+    String(Math.max(0, kombostopAttemptsLeft)).padStart(2, '0');
+
+  const nextHealth = kolimbusHealth - kolimbusMaxHealth * 0.20;
+
+  if (nextHealth <= 0) {
+    // Kolimbusovi hrozí 0 % - místo toho zůstane na 5 % a rozbliká se
+    kolimbusHealth = kolimbusMaxHealth * 0.05;
+    updateKolimbusHealthbarUI();
+    setTimeout(() => triggerAshActivation(), 600);
+  } else {
+    kolimbusHealth = nextHealth;
+    updateKolimbusHealthbarUI();
+  }
+}
+
+/* Speciální dorážecí útok Türera: skočí ke Kolimbusovi, udeří, a srazí
+   Kolimbusovo zdraví na pouhých 5 % (spouští finální fázi - Aktivaci Ashe). */
+function runTurerSpecialAttack() {
+  const turer = document.getElementById('asset-turer');
+  const kolimbus = document.getElementById('asset-kolimbus1');
+  const originalLeft = 170, originalTop = 210;
+  const jumpLeft = 840, jumpTop = 204;
+
+  playSFX('sfx-woosh2', 0.5);
+  turer.style.left = jumpLeft + 'px';
+  turer.style.top = jumpTop + 'px';
+
+  setTimeout(() => {
+    playSFX('sfx-hit1', 0.6);
+    kolimbus.classList.add('hit-flash');
+    setTimeout(() => kolimbus.classList.remove('hit-flash'), 400);
+
+    // Kolimbusovi zůstane přesně 5 % jeho maximálního zdraví
+    kolimbusHealth = kolimbusMaxHealth * 0.05;
+    updateKolimbusHealthbarUI();
+
+    setTimeout(() => {
+      turer.style.left = originalLeft + 'px';
+      turer.style.top = originalTop + 'px';
+      setTimeout(() => triggerAshActivation(), 500);
+    }, 600);
+  }, 450);
+}
+
+/* Po vyhodnocení tahu (úspěch i neúspěch, pokud hra ještě neskončila aktivací
+   Ashe) se modální okno minihry znovu zobrazí a začíná další tah. */
+function finishCombatTurn() {
+  // Pokud už proběhla aktivace Ashe, dál se v minihře nepokračuje
+  if (ashActivationTriggered) return;
+
+  const modal = document.getElementById('modal-kombostop');
+  modal.classList.remove('hide-temp');
+  startKombostopRound();
+}
+
+/* ==========================================================================
+   3) AKTIVACE ASHE
+   ========================================================================== */
+let ashActivationTriggered = false;
+let ashSequenceStarted = false;
+
+function triggerAshActivation() {
+  if (ashActivationTriggered) return;
+  ashActivationTriggered = true;
+
+  document.getElementById('modal-kombostop').style.display = 'none';
+
+  // Kolimbus1 zmizí, Kolimbus2 se objeví na 1020,375px a pomalu sjede na 1020,385px
+  document.getElementById('asset-kolimbus1').style.display = 'none';
+  const kolimbus2 = document.getElementById('asset-kolimbus2');
+  kolimbus2.style.display = 'block';
+  kolimbus2.style.top = '375px';
+  playSFX('sfx-drop', 0.7);
+
+  setTimeout(() => {
+    kolimbus2.style.top = '385px';
+  }, 50);
+
+  // Healthbar Kolimbuse bliká mezi zelenou a bílou na 5% zdraví
+  kolimbusHealth = kolimbusMaxHealth * 0.05;
+  updateKolimbusHealthbarUI();
+  document.getElementById('healthbar-kol-green').classList.add('health-critical-blink');
+
+  setTimeout(() => {
+    showBubble('text13-mb.png', 967, 240, 'text13');
+  }, 1300);
+}
+
+/* Po zavření text13-mb.png se zobrazí inventář - klik na "groovie" spustí portál + Ash */
+function showInventoryForAsh() {
+  const inv = document.getElementById('inventory');
+  inv.classList.add('visible');
+}
+
+function clickInventoryItem(key) {
+  if (key === 'groovie') {
+    if (ashActivationTriggered && !ashSequenceStarted) {
+      ashSequenceStarted = true;
+      // Ikona zmizí z inventáře, inventář se opět skryje
+      const groovieIcon = document.querySelector('.inv-item[alt="Groovie"]');
+      if (groovieIcon) groovieIcon.classList.add('inv-hidden');
+      const inv = document.getElementById('inventory');
+      inv.classList.remove('visible');
+
+      summonAsh();
+    } else {
+      showItemText('groovie');
+    }
+  } else if (key === 'slivovice') {
+    if (calledBures && !slivovicaDrunk) {
+      drinkSlivovice();
+    } else {
+      showItemText('slivovice');
+    }
+  }
+}
+
+function summonAsh() {
+  // Portál se postupně zobrazí (opacity 0 -> 100%)
+  const portal = document.getElementById('asset-portal');
+  portal.style.opacity = '1';
+  playSFX('sfx-portal', 0.8);
+
+  setTimeout(() => {
+    // Ash se postupně zobrazí (opacity 0 -> 100%)
+    const ash = document.getElementById('asset-ash');
+    ash.style.opacity = '1';
+
+    setTimeout(() => {
+      showBubble('text14-mb.png', 895, 157, 'text14');
+    }, 1500);
+  }, 800);
+}
+
+/* Po zavření text14-mb.png: Türer zaútočí na Ash, Ash zmizí, portál zmizí */
+function runAshDefeatSequence() {
+  playSFX('sfx-woosh2', 0.5);
+
+  const turer = document.getElementById('asset-turer');
+  const originalLeft = 170, originalTop = 210;
+  const strikeLeft = 358, strikeTop = 207;
+
+  turer.style.left = strikeLeft + 'px';
+  turer.style.top = strikeTop + 'px';
+
+  setTimeout(() => {
+    turer.style.left = (strikeLeft + 10) + 'px';
+    playSFX('sfx-hit1', 0.6);
+
+    setTimeout(() => {
+      const ash = document.getElementById('asset-ash');
+      ash.classList.add('ash-blink');
+
+      setTimeout(() => {
+        ash.style.display = 'none';
+        ash.classList.remove('ash-blink');
+        playSFX('sfx-portal', 0.6); // dokument: "potral.mp3" (překlep) - stejný zvuk jako portal.mp3
+
+        const portal = document.getElementById('asset-portal');
+        portal.style.opacity = '0';
+
+        setTimeout(() => {
+          // Türer se vrátí na výchozí pozici
+          turer.style.left = originalLeft + 'px';
+          turer.style.top = originalTop + 'px';
+
+          setTimeout(() => runCallBuresSequence(), 500);
+        }, 400);
+      }, 1500); // 3x blink (CSS animation 0.5s x 3 = 1.5s)
+    }, 250);
+  }, 50);
+}
+
+/* ==========================================================================
+   4) VOLÁNÍ BUREŠE
+   ========================================================================== */
+let calledBures = false;
+let slivovicaDrunk = false;
+
+function runCallBuresSequence() {
+  showBubble('text7-mb.png', 339, 133, 'text7');
+}
+
+function runCallBuresStep2() {
+  // MK1.mp3 se postupně stlumí na 0, znovu se spustí calm-night.mp3
+  fadeOutSFX('audio-mk1', 1500, () => {
+    const bgm = document.getElementById('audio-bgm');
+    bgm.volume = 0.4;
+    bgm.play().catch(e => console.log('BGM waiting for interaction.'));
+  });
+
+  playSFX('sfx-vola-bures', 0.7);
+  calledBures = true;
+
+  showBubble('text8-mb.png', 379, 151, 'text8');
+}
+
+function removeTurerHealthbar() {
+  document.getElementById('ramecek-tur').style.display = 'none';
+  document.getElementById('text-tur').style.display = 'none';
+  document.getElementById('healthbar-tur-track').style.display = 'none';
+
+  // Náčinka1 zmizí, Náčinka2 se objeví na stejné pozici
+  document.getElementById('asset-nacinka1').style.display = 'none';
+  document.getElementById('asset-nacinka2').style.display = 'block';
+
+  showBubble('text9-mb.png', 317, 40, 'text9');
+}
+
+function runFootstepsStep() {
+  // Postavy Türer a Náčinka2 zmizí ze scény
+  document.getElementById('asset-turer').style.display = 'none';
+  document.getElementById('asset-nacinka2').style.display = 'none';
+
+  playSFX('sfx-kroky-branka', 0.5);
+
+  showBubble('text10-mb.png', 986, 216, 'text10');
+}
+
+function showInventoryForSlivovice() {
+  const inv = document.getElementById('inventory');
+  inv.classList.add('visible');
+}
+
+function drinkSlivovice() {
+  slivovicaDrunk = true;
+
+  // Ikona slivovice zmizí z inventáře
+  document.getElementById('slivovice-icon').classList.add('inv-hidden');
+  document.getElementById('inventory').classList.remove('visible');
+
+  playSFX('sfx-gulping', 0.6);
+
+  // Zastavíme kritické blikání healthbaru (pokud ještě běželo) - zdraví
+  // samotné (5 %) se ale zatím NEMĚNÍ, doplní se až postupně se zvukem hard.mp3.
+  document.getElementById('healthbar-kol-green').classList.remove('health-critical-blink');
+
+  const gulping = document.getElementById('sfx-gulping');
+  gulping.addEventListener('ended', () => {
+    playSFX('sfx-hard', 0.6);
+    fillKolimbusHealthWithHardSound();
+    runKolimbusFlickerSequence();
+  }, { once: true });
+}
+
+/* Slivovice dodá Kolimbusovi sílu - zdraví se postupně doplní z 5 % na 100 %
+   přesně po dobu trvání zvuku hard.mp3 (4s). Healthbar tedy "naroste"
+   synchronně s hraním zvuku, místo okamžitého skuku na plnou hodnotu. */
+function fillKolimbusHealthWithHardSound() {
+  const fillDuration = 4000; // 4s, odpovídá délce hard.mp3
+  const green = document.getElementById('healthbar-kol-green');
+
+  kolimbusHealth = kolimbusMaxHealth;
+
+  // Aktivujeme CSS transition jen na dobu plnění, ať se mimo tuto sekvenci
+  // healthbar nadále chová okamžitě (např. při odečítání zdraví v souboji).
+  green.classList.add('health-fill-anim');
+
+  // Vynutíme reflow, aby prohlížeč zaregistroval výchozí (5%) šířku
+  // PŘED přidáním transition třídy a následnou změnou na 100 % - jinak
+  // by mohl přechod proběhnout bez animace.
+  void green.offsetWidth;
+
+  updateKolimbusHealthbarUI(); // nastaví width na 100%, transition zajistí plynulý nárůst po dobu 4s
+
+  setTimeout(() => {
+    green.classList.remove('health-fill-anim');
+  }, fillDuration);
+}
+
+/* Po dobu trvání zvuku hard.mp3 (4s) se střídají 4 fáze (Kolimbus3, jeho
+   "rozsvícená" verze, Kolimbus2, jeho "rozsvícená" verze), změna se stále
+   zrychluje. Kolimbus2 a Kolimbus3 jsou DVA samostatné obrázky na DVOU
+   různých pozicích (Kolimbus2: 1020,375px - níž a vlevo; Kolimbus3:
+   1032,213px - výš), takže blikání mezi nimi vizuálně působí, jako by se
+   postava při vstávání ze země zvedala nahoru. Na konci zůstane zobrazen
+   Kolimbus3.png na jeho pozici. */
+function runKolimbusFlickerSequence() {
+  const totalDuration = 4000; // 4s, odpovídá délce hard.mp3
+  const kolimbus2 = document.getElementById('asset-kolimbus2');
+  const kolimbus3 = document.getElementById('asset-kolimbus3');
+
+  const frames = ['kolimbus3', 'kolimbus3-lit', 'kolimbus2', 'kolimbus2-lit'];
+  let frameIndex = 0;
+  let elapsed = 0;
+  let currentInterval = 220; // počáteční rychlost přepínání (ms), postupně se zrychluje
+
+  kolimbus2.src = 'Kolimbus2.png';
+  kolimbus3.src = 'Kolimbus3.png';
+  kolimbus2.style.filter = 'none';
+  kolimbus3.style.filter = 'none';
+
+  function showFrame(frameName) {
+    if (frameName === 'kolimbus3') {
+      kolimbus3.style.filter = 'none';
+      kolimbus3.style.display = 'block';
+      kolimbus2.style.display = 'none';
+    } else if (frameName === 'kolimbus3-lit') {
+      kolimbus3.style.filter = 'brightness(2.2) saturate(0)';
+      kolimbus3.style.display = 'block';
+      kolimbus2.style.display = 'none';
+    } else if (frameName === 'kolimbus2') {
+      kolimbus2.style.filter = 'none';
+      kolimbus2.style.display = 'block';
+      kolimbus3.style.display = 'none';
+    } else if (frameName === 'kolimbus2-lit') {
+      kolimbus2.style.filter = 'brightness(2.2) saturate(0)';
+      kolimbus2.style.display = 'block';
+      kolimbus3.style.display = 'none';
+    }
+  }
+
+  function tick() {
+    showFrame(frames[frameIndex % frames.length]);
+    frameIndex++;
+    elapsed += currentInterval;
+    // Zrychlování: každý krok je o trochu kratší, dokud nedosáhneme minima
+    currentInterval = Math.max(40, currentInterval * 0.85);
+
+    if (elapsed < totalDuration) {
+      setTimeout(tick, currentInterval);
+    } else {
+      // Konec sekvence - zůstane zobrazen Kolimbus3.png v normální podobě na jeho pozici
+      kolimbus2.style.display = 'none';
+      kolimbus3.style.display = 'block';
+      kolimbus3.style.filter = 'none';
+      showBubble('text11-mb.png', 786, 148, 'text11');
+    }
+  }
+  tick();
+}
+
+function activateDarek() {
+  const darek = document.getElementById('asset-darek');
+  darek.classList.add('active');
+}
+
+function clickDarek() {
+  if (!document.getElementById('asset-darek').classList.contains('active')) return;
+  showBubble('text12-mb.png', 708, 162, 'text12');
+}
+
+/* ==========================================================================
+   POMOCNÉ MODÁLY PRO INVENTÁŘ (předměty bez speciální herní akce)
+   ========================================================================== */
+const itemTexts = {
+  '500': "Bonus za úspěšné hospodaření Lesů České republiky. Čuráci.",
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'groovie': "Ashe zatím povolat nepotřebuju.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+  'slivovice': "Podle vůně je asi dost silná. Postavila by na nohy i mrtvého."
+};
+
+function showItemText(key) {
+  document.getElementById('item-description-text').innerText = itemTexts[key] || '';
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

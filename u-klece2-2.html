@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - U klece</title>
+<style>
+  /* Import herních fontů */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  /* Reset okrajů a nastavení box-sizingu */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow: hidden;
+  }
+
+  /* Hlavní herní kontejner s pevným rozlišením 900x768px */
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('U_klece-bkg.jpg'); /* Pozadí scény */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  /* ---- INVENTÁŘ ---- */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  #sponka-icon {
+    display: block;
+  }
+
+  #slivovice-icon {
+    display: block; 
+  }
+
+  /* ---- ELEMENTY SCÉNY ---- */
+  .game-asset {
+    position: absolute;
+  }
+  
+  #asset-popelnice { left: 32px;  top: 331px; z-index: 1; cursor: pointer; }
+  #asset-ostnac    { left: 238px; top: 177px; z-index: 2; cursor: pointer; }
+  #asset-krev      { left: 484px; top: 521px; z-index: 3; cursor: pointer; }
+  #asset-zamek     { left: 404px; top: 383px; z-index: 4; cursor: pointer; }
+  #asset-klec      { left: 252px; top: 245px; z-index: 5; pointer-events: none; } 
+  #asset-kolimbus  { left: 217px; top: 313px; z-index: 6; pointer-events: none; } 
+  #asset-kolimbus2 { left: 186px; top: 472px; z-index: 6; pointer-events: none; display: none;}
+  #asset-darek     { left: 474px;  top: 465px; z-index: 3; cursor: pointer; display: block; }
+
+  /* ---- DIALOGOVÉ BUBLINY ---- */
+  .bubble {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 100; 
+    transition: transform 0.1s;
+  }
+  .bubble:hover {
+    transform: scale(1.02);
+  }
+
+  /* ---- MODÁLNÍ OKNA ---- */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 200;
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .text-modal-content {
+    background: #2a2a2a;
+    border: 3px solid #ffcc00;
+    border-radius: 10px;
+    padding: 25px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  .text-modal-content p {
+    font-size: 18px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    line-height: 1.4;
+  }
+  .text-modal-content button {
+    background: #ffcc00;
+    color: #111;
+    border: none;
+    padding: 8px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .text-modal-content button:hover { background: #ffee55; }
+
+  /* ---- FÁZE B: LOCKPICKING MINIGAME MODAL ---- */
+  #modal-lockpicking {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #lockpick-container {
+    width: 498px;
+    height: 388px;
+    background-image: url('U_klece-lckpck-bkg.png');
+    background-size: cover;
+    position: relative;
+    user-select: none;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  }
+
+  #asset-sponka {
+    position: absolute;
+    z-index: 160;
+    transition: left 0.2s ease, top 0.2s ease;
+  }
+
+  #btn-pry {
+    position: absolute;
+    left: 152px;
+    top: 295px;
+    width: 194px;
+    height: 52px;
+    background: #24cc39;
+    border: 2px solid #111;
+    border-radius: 8px;
+    color: #fff;
+    font-family: 'Arial', sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 165;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+  #btn-pry:active {
+    background: #1eb330;
+  }
+
+  #progress-bar-bg {
+    position: absolute;
+    left: 382px;
+    top: 83px;
+    width: 38px;
+    height: 175px;
+    background: #555;
+    border: 2px solid #222;
+    z-index: 155;
+    overflow: hidden;
+  }
+
+  #progress-fill {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: #cc2424;
+  }
+
+  #green-zone {
+    position: absolute;
+    width: 100%;
+    left: 0;
+    background: #24cc39;
+  }
+
+  #progress-mask {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: #555;
+    z-index: 2;
+  }
+
+  /* ---- ZÁVĚREČNÉ PŘEPADENÍ ---- */
+  #blackout-overlay {
+    position: absolute;
+    width: 900px;
+    height: 768px;
+    background: #000;
+    z-index: 500; 
+    opacity: 0;
+    display: none;
+    transition: opacity 1s ease;
+  }
+
+  #bubble-10 {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 510;
+    display: none;
+    cursor: pointer;
+  }
+
+  /* ---- TLAČÍTKO POKRAČOVAT ---- */
+  #btn-final-continue {
+    display: none;
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    background: #00cc44;
+    color: #fff;
+    border: none;
+    padding: 15px 35px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    z-index: 520; 
+    text-transform: uppercase;
+    animation: pulse 1.5s infinite;
+  }
+  #btn-final-continue:hover {
+    background: #00ee55;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50% { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  
+  <div id="inventory">
+    <img class="inv-item" src="groovie-icon.png" alt="Groovie" onclick="showItemText('groovie')">
+    <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+    <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+    <img class="inv-item" src="500-icon.png" alt="500" onclick="showItemText('500')">
+    <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+    <img class="inv-item" id="sponka-icon" src="sponka-icon.png" alt="Sponka" onclick="triggerSponkaClick()">
+    <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    <img class="inv-item" id="slivovice-icon" src="slivovice-icon.png" alt="Slivovice" onclick="showItemText('slivovice')">
+  </div>
+
+  <img id="asset-popelnice" class="game-asset" src="U_klece-popelnice.png" alt="Popelnice" onclick="clickEvidence('popelnice')">
+  <img id="asset-ostnac" class="game-asset" src="U_klece-ostnac.png" alt="Ostnáč" onclick="clickEvidence('ostnac')">
+  <img id="asset-krev" class="game-asset" src="U_klece-krev.png" alt="Krev" onclick="clickEvidence('krev')">
+  <img id="asset-zamek" class="game-asset" src="U_klece-zamek.png" alt="Zámek" onclick="clickEvidence('zamek')">
+  <img id="asset-klec" class="game-asset" src="U_klece-klec.png" alt="Klec">
+  <img id="asset-kolimbus" class="game-asset" src="U_klece-Kolimbus.png" alt="Kolimbus">
+  <img id="asset-kolimbus2" class="game-asset" src="U_klece-Kolimbus2-2.png" alt="Kolimbus2">
+  <img id="asset-darek" class="game-asset" src="U_klece-darek.png" alt="Dárek" onclick="clickEvidence('darek')">
+
+  <img id="active-bubble" class="bubble" src="" alt="Textová bublina" onclick="closeBubble()">
+
+  <div id="modal-lockpicking">
+    <div id="lockpick-container">
+      <img id="asset-sponka" src="U_klece-sponka.png" alt="Sponka">
+      
+      <div id="btn-pry">Podržením páčit</div>
+      
+      <div id="progress-bar-bg">
+        <div id="progress-fill">
+          <div id="green-zone"></div>
+        </div>
+        <div id="progress-mask"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="blackout-overlay"></div>
+  <img id="bubble-10" src="U_klece-text10.png" alt="Text 10" onclick="closeBlackoutBubble()">
+
+  <button id="btn-final-continue" onclick="window.location.href='u-klece-miniboss3-5.html'">Pokračovat</button>
+
+</div>
+
+<div id="modal-item-text" class="modal-overlay">
+  <div class="text-modal-content">
+    <p id="item-description-text">Text předmětu...</p>
+    <button onclick="closeItemModal()">Zavřít</button>
+  </div>
+</div>
+
+<audio id="audio-bgm" src="calm-night.mp3" loop></audio>
+<audio id="sfx-lockpicking" src="lockpicking.mp3" loop></audio>
+<audio id="sfx-right-pick" src="right-pick.mp3"></audio>
+<audio id="sfx-wrong-pick" src="wrong-pick.mp3"></audio>
+<audio id="sfx-lock-open" src="lock-open.mp3"></audio>
+<audio id="sfx-kolimbus-hit" src="Kolimbus-hit.mp3"></audio>
+<audio id="sfx-mamete" src="mamete.mp3"></audio>
+
+<script>
+  // ---- DATA A KONFIGURACE ----
+  const itemTexts = {
+    '500': "Bonus za úspěšné hospodaření Lesů České republiky. Čuráci.",
+    'autoplay': "Tohle si schovám až na velké finále.",
+    'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+    'groovie': "Ashe zatím povolat nepotřebuju.",
+    'joint': "Zhulím se až později, až všechno vyřídím.",
+    'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+    'slivovice': "Podle vůně je asi dost silná. Postavila by na nohy i mrtvého.",
+    'sponka_pred_zamkem': "Zkus otevřít dveře klece."
+  };
+
+  const evidenceConfig = {
+    'popelnice': { img: 'U_klece-text4.png', x: 78, y: 116 },
+    'ostnac':    { img: 'U_klece-text3.png', x: 82, y: 112 },
+    'krev':      { img: 'U_klece-text8.png', x: 85, y: 117 },
+    'darek':     { img: 'U_klece-text5.png', x: 74, y: 112 },
+    'zamek':     { img: 'U_klece-text6.png', x: 76, y: 115 },
+    'zamek_done':{ img: 'U_klece-text9.png', x: 74, y: 112 }
+  };
+
+  const sponkaPositions = [
+    { x: 21,  y: 120 },
+    { x: 65,  y: 120 },
+    { x: 113, y: 120 },
+    { x: 155, y: 120 }
+  ];
+
+  let introStep = 1; 
+  let phaseAActive = false;
+  let clickedEvidences = new Set();
+  const totalEvidencesRequired = 5; 
+
+  let currentLockStep = 0; 
+  let progressInterval = null;
+  let progressValue = 0; 
+  let minigameActive = false;
+  
+  let greenZoneStart = 0;
+  let greenZoneEnd = 0;
+
+  // ---- HUDBA NA POZADÍ ----
+  document.addEventListener('click', function initBGM() {
+    const bgm = document.getElementById('audio-bgm');
+    if (bgm.paused) {
+      bgm.volume = 0.5;
+      bgm.play().catch(e => console.log("Audio activation waiting."));
+    }
+    document.removeEventListener('click', initBGM);
+  });
+
+  function playSFX(elementId, volume, loop = false) {
+    const sfx = document.getElementById(elementId);
+    if (sfx) {
+      if (!loop) sfx.currentTime = 0;
+      sfx.volume = volume;
+      if (loop && sfx.paused) {
+        sfx.play().catch(e => console.log(e));
+      } else if (!loop) {
+        sfx.play().catch(e => console.log(e));
+      }
+    }
+  }
+
+  function stopSFX(elementId) {
+    const sfx = document.getElementById(elementId);
+    if (sfx) {
+      sfx.pause();
+      sfx.currentTime = 0;
+    }
+  }
+
+  // ---- INICIALIZACE SCÉNY ----
+  window.addEventListener('DOMContentLoaded', () => {
+    showIntroBubble(1, 73, 111);
+  });
+
+  function showIntroBubble(id, x, y) {
+    const bubble = document.getElementById('active-bubble');
+    bubble.src = `U_klece-text${id}.png`;
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+    bubble.style.display = 'block';
+  }
+
+  function closeBubble() {
+    const bubble = document.getElementById('active-bubble');
+    bubble.style.display = 'none';
+
+    if (introStep === 1) {
+      introStep = 2;
+      showIntroBubble(2, 78, 115);
+    } else if (introStep === 2) {
+      introStep = 0; 
+      phaseAActive = true; 
+    } else if (introStep === 'trigger_b') {
+      introStep = 'await_sponka_click';
+    }
+  }
+
+  // ---- FÁZE A: HLEDÁNÍ DŮKAZŮ ----
+  function clickEvidence(key) {
+    if (!phaseAActive) return;
+
+    clickedEvidences.add(key);
+    let config = evidenceConfig[key];
+
+    if (key === 'zamek' && clickedEvidences.size >= totalEvidencesRequired) {
+      config = evidenceConfig['zamek_done'];
+      introStep = 'trigger_b'; 
+    }
+
+    const bubble = document.getElementById('active-bubble');
+    bubble.src = config.img;
+    bubble.style.left = `${config.x}px`;
+    bubble.style.top = `${config.y}px`;
+    bubble.style.display = 'block';
+  }
+
+  function triggerSponkaClick() {
+    if (phaseAActive && clickedEvidences.size < totalEvidencesRequired) {
+      const bubble = document.getElementById('active-bubble');
+      bubble.src = 'U_klece-text7.png';
+      bubble.style.left = '83px';
+      bubble.style.top = '111px';
+      bubble.style.display = 'block';
+    } else if (introStep === 'await_sponka_click') {
+      startPhaseB();
+    } else if (phaseAActive && clickedEvidences.size >= totalEvidencesRequired) {
+      showItemText('sponka_pred_zamkem');
+    } else {
+      showItemText('sponka');
+    }
+  }
+
+  // ---- FÁZE B: MINIHRA OTEVÍRÁNÍ ZÁMKU ----
+  function startPhaseB() {
+    phaseAActive = false;
+    minigameActive = true;
+    introStep = 0;
+    
+    const sponkaIcon = document.getElementById('sponka-icon');
+    if (sponkaIcon) {
+      sponkaIcon.style.display = 'none';
+    }
+    
+    document.getElementById('modal-lockpicking').style.display = 'flex';
+    currentLockStep = 0;
+    updateSponkaPosition();
+    prepareLockStep();
+    setupMinigameControls();
+  }
+
+  function updateSponkaPosition() {
+    const sponka = document.getElementById('asset-sponka');
+    const pos = sponkaPositions[currentLockStep];
+    sponka.style.left = `${pos.x}px`;
+    sponka.style.top = `${pos.y}px`;
+  }
+
+  function prepareLockStep() {
+    progressValue = 0;
+    document.getElementById('progress-mask').style.height = `100%`;
+
+    const zoneHeight = Math.floor(Math.random() * 11) + 15;
+    greenZoneStart = Math.floor(Math.random() * (60 - zoneHeight)) + 20;
+    greenZoneEnd = greenZoneStart + zoneHeight;
+
+    const gzEl = document.getElementById('green-zone');
+    gzEl.style.bottom = `${greenZoneStart}%`;
+    gzEl.style.height = `${zoneHeight}%`;
+  }
+
+  function setupMinigameControls() {
+    const btn = document.getElementById('btn-pry');
+
+    const startEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+    const endEvent = 'ontouchstart' in window ? 'touchend' : 'mouseup';
+
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.addEventListener(startEvent, (e) => {
+      e.preventDefault();
+      if (!minigameActive) return;
+
+      playSFX('sfx-lockpicking', 0.5, true);
+
+      progressInterval = setInterval(() => {
+        if (progressValue < 100) {
+          progressValue += 1.5;
+          if (progressValue > 100) progressValue = 100;
+          document.getElementById('progress-mask').style.height = `${100 - progressValue}%`;
+        } else {
+          handlePickRelease();
+        }
+      }, 25);
+    });
+
+    window.addEventListener(endEvent, () => {
+      if (progressInterval) {
+        handlePickRelease();
+      }
+    });
+  }
+
+  function handlePickRelease() {
+    clearInterval(progressInterval);
+    progressInterval = null;
+    stopSFX('sfx-lockpicking');
+
+    if (!minigameActive) return;
+
+    if (progressValue >= greenZoneStart && progressValue <= greenZoneEnd) {
+      playSFX('sfx-right-pick', 0.5);
+      
+      if (currentLockStep < 3) {
+        currentLockStep++;
+        updateSponkaPosition();
+        prepareLockStep();
+      } else {
+        minigameActive = false;
+        const btn = document.getElementById('btn-pry');
+        btn.innerText = "Otevřít";
+        
+        const finalBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(finalBtn, btn);
+        finalBtn.addEventListener('click', triggerLockOpen);
+      }
+    } else {
+      playSFX('sfx-wrong-pick', 0.5);
+      
+      if (currentLockStep > 0) {
+        currentLockStep--;
+      }
+      
+      updateSponkaPosition();
+      prepareLockStep();
+    }
+  }
+
+  // ---- ZÁVĚREČNÁ SEKVENCE (Přepadení) ----
+  function triggerLockOpen() {
+    playSFX('sfx-lock-open', 1.0);
+    document.getElementById('asset-kolimbus').style.display = 'none';
+    document.getElementById('asset-kolimbus2').style.display = 'block';
+    document.getElementById('modal-lockpicking').style.display = 'none';
+
+    playSFX('sfx-kolimbus-hit', 1.0);
+
+    const blackout = document.getElementById('blackout-overlay');
+    blackout.style.display = 'block';
+    setTimeout(() => {
+      blackout.style.opacity = '1';
+    }, 50);
+
+    document.getElementById('sfx-kolimbus-hit').addEventListener('ended', () => {
+      document.getElementById('bubble-10').style.display = 'block';
+      playSFX('sfx-mamete', 0.6);
+    });
+  }
+
+  function closeBlackoutBubble() {
+    document.getElementById('bubble-10').style.display = 'none';
+    document.getElementById('btn-final-continue').style.display = 'block';
+  }
+
+  // ---- POMOCNÉ MODÁLY PRO INVENTÁŘ ----
+  function showItemText(key) {
+    document.getElementById('item-description-text').innerText = itemTexts[key];
+    document.getElementById('modal-item-text').style.display = 'flex';
+  }
+
+  function closeItemModal() {
+    document.getElementById('modal-item-text').style.display = 'none';
+  }
+</script>
+
+</body>
+</html>

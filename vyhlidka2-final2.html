@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kolimbus - Vyhlídka</title>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    body {
+        margin: 0;
+        background: #111;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+    }
+
+    #outside-wrapper {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        cursor: pointer;
+    }
+
+    #game-container {
+        position: relative;
+        width: 900px;
+        height: 768px;
+        overflow: hidden;
+        background: #000;
+        z-index: 2;
+        user-select: none;
+        transition: box-shadow 0.5s, border-color 0.5s, opacity 0.5s;
+    }
+
+    @keyframes border-pulse-yellow {
+        0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); border: 2px solid transparent; }
+        50% { box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.6); border: 2px solid #ffd700; }
+        100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); border: 2px solid transparent; }
+    }
+    .pulse-yellow-active {
+        box-sizing: border-box;
+        animation: border-pulse-yellow 2s infinite ease-in-out;
+    }
+
+    .game-asset {
+        position: absolute;
+        display: block;
+        cursor: default;
+    }
+
+    .clickable {
+        cursor: pointer;
+    }
+
+    #inventory {
+        position: absolute;
+        top: 15px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(20, 20, 20, 0.3);
+        border-radius: 8px;
+        padding: 8px 15px;
+        display: flex;
+        gap: 12px;
+        z-index: 100;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .inv-item {
+        width: 48px; height: 48px;
+        object-fit: contain;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .inv-item:hover {
+        transform: scale(1.1);
+    }
+
+    @keyframes buddha-pulse {
+        0% { filter: brightness(1) contrast(1); }
+        25% { filter: brightness(1.5) contrast(1.5); }
+        50% { filter: brightness(1) contrast(1); }
+        75% { filter: brightness(1.5) contrast(1.5); }
+        100% { filter: brightness(1) contrast(1); }
+    }
+    .buddha-pulse-anim {
+        animation: buddha-pulse 2.5s linear;
+    }
+
+    @keyframes hint-move {
+        0%   { left: 265px; top: 279px; opacity: 0; }
+        10%  { opacity: 1; }
+        50%  { left: 285px; top: 259px; opacity: 1; } 
+        100% { left: 305px; top: 239px; opacity: 0; }
+    }
+    .hint-anim {
+        animation: hint-move 2.5s linear forwards;
+    }
+
+    /* --- NOVÉ TŘÍDY PRO ZÁVĚREČNOU ANIMACI --- */
+    #zoom-wrapper {
+        position: fixed;
+        inset: 0;
+        z-index: 500;
+        display: none;
+        overflow: hidden;
+        background: #000;
+    }
+
+    #comic-layout {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: 2876px; height: 4004px;
+        background: url('Layout2.jpg') no-repeat center center;
+        background-size: contain;
+        transform-origin: 50% 50%;
+    }
+
+    .comic-number {
+        position: absolute;
+        font-size: 250px;
+        font-family: 'Share Tech Mono', monospace;
+        color: #fff;
+        text-shadow: 0 0 30px rgba(0,0,0,1);
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: all 0.8s ease-in-out;
+        z-index: 100;
+        font-weight: bold;
+    }
+
+    .master-number {
+        position: absolute;
+        font-family: 'Share Tech Mono', monospace;
+        color: #fff;
+        text-shadow: 0 0 30px #fff, 0 0 50px #00ffcc;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        font-size: 500px;
+        transition: all 1.5s ease-in-out;
+        z-index: 150;
+        font-weight: bold;
+    }
+
+    @keyframes blink-icon {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.1; filter: brightness(1.5); }
+    }
+
+    #btn-pokracovat {
+        position: absolute;
+        right: 40px; bottom: 40px;
+        display: none;
+        z-index: 300;
+        padding: 15px 40px;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 20px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #111;
+        background: #00cc44;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+        animation: pulse-continue 1.4s infinite ease-in-out;
+    }
+
+    @keyframes pulse-continue {
+        0%   { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+        50%  { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+        100% { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    }
+</style>
+</head>
+<body>
+
+<div id="outside-wrapper"></div>
+
+<div id="game-container">
+    
+    <!-- POZADÍ -->
+    <img id="bg1" class="game-asset" src="Vyhlidka-bkg.jpg" style="inset: 0; width: 100%; height: 100%; z-index: 1; object-fit: cover;">
+    <img id="bg2" class="game-asset" src="Vyhlidka-bkg2.jpg" style="inset: 0; width: 100%; height: 100%; z-index: 2; object-fit: cover; opacity: 0;">
+
+    <!-- SESTAVENÍ SCÉNY -->
+    <img id="vetve" class="game-asset" src="vhldk-vetve.png" style="left: 462px; top: -15px; z-index: 10;">
+    <img id="buddha-static" class="game-asset" src="mrak-buddha-01.png" style="left: 278px; top: 17px; z-index: 11;">
+    <img id="kolimbus" class="game-asset" src="vhldk-Kolimbus.png" style="left: 428px; top: 540px; z-index: 12;">
+
+    <!-- DYNAMICKÉ PRVKY -->
+    <img id="zlt-bbln" class="game-asset" src="zlt-bbln.png" style="left: 44px; top: 43px; z-index: 20; opacity: 0; transition: opacity 1.5s ease;">
+    
+    <img id="text1" class="game-asset clickable" src="vhldk-text1.png" style="left: 188px; top: 457px; z-index: 21; display: none;">
+    <img id="text2" class="game-asset clickable" src="vhldk-text2.png" style="left: 223px; top: 469px; z-index: 22; display: none;">
+
+    <!-- HALUCINACE -->
+    <img id="mrak-buddha" class="game-asset" src="mrak-buddha.png" style="left: 278px; top: 17px; z-index: 30; opacity: 0; transition: opacity 1.5s ease;">
+    <img id="text3" class="game-asset clickable" src="vhldk-text3.png" style="left: 208px; top: 447px; z-index: 31; display: none;">
+
+    <!-- NÁPOVĚDA -->
+    <img id="text4" class="game-asset" src="vhldk-text4.png" style="z-index: 40; display: none; opacity: 0;">
+    <img id="text5" class="game-asset" src="vhldk-text5.png" style="z-index: 40; display: none; opacity: 0;">
+    <img id="text6" class="game-asset clickable" src="vhldk-text6.png" style="left: 184px; top: 431px; z-index: 41; display: none;">
+
+    <!-- INVENTÁŘ -->
+    <div id="inventory">
+      <img id="inv-autoplay" class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showModalText('autoplay')">
+      <img id="inv-deska" class="inv-item" src="deska-icon.png" alt="Deska" onclick="showModalText('deska')">
+      <img id="inv-sluchatka" class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showModalText('sluchatka')">
+      <img id="inv-flipper" class="inv-item" src="flipper-icon.png" alt="Flipper" onclick="showModalText('flipper')">
+    </div>
+
+    <!-- TLAČÍTKO POKRAČOVAT S PŘESMĚROVÁNÍM NA final3-1.html -->
+    <button id="btn-pokracovat" onclick="window.location.href='final3-1.html'">POKRAČOVAT</button>
+
+</div>
+
+<!-- ZOOM SEKVENČNÍ KONTEJNER PRO LAYOUT 2 -->
+<div id="zoom-wrapper">
+    <div id="comic-layout">
+        <div id="master-top" class="master-number" style="left: 1444px; top: 803px;">6</div>
+        <div id="master-bot" class="master-number" style="left: 1444px; top: 3205px;">6</div>
+        <div id="master-616" class="master-number" style="left: 1444px; top: 2007px; font-size: 600px; display: none; letter-spacing: 5px;">616</div>
+        <img id="finale-616-icon" src="616-icon.png" style="position: absolute; left: 1444px; top: 2007px; transform: translate(-50%, -50%); display: none; z-index: 200; width: 450px;">
+    </div>
+</div>
+
+<!-- MODÁLNÍ OKNO PRO TEXTY -->
+<div id="modal-item-text" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #00cc44; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4; color:#fff; font-family:Arial, sans-serif;"></p>
+    <button onclick="closeItemModal()" style="background:#00cc44; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<script>
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function playAudio(src, vol, loop = false) {
+    const audio = new Audio(src);
+    audio.volume = vol;
+    audio.loop = loop;
+    audio.play().catch(e => console.warn(`Nepodařilo se přehrát ${src}:`, e));
+    return audio;
+}
+
+let audioCtx;
+function playXyloTone(index) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    
+    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51];
+    osc.frequency.setValueAtTime(notes[Math.min(index, notes.length - 1)], audioCtx.currentTime);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.6, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+    
+    osc.start(now);
+    osc.stop(now + 1.1);
+}
+
+let audioInitialized = false;
+function initAmbientAudio() {
+    if (!audioInitialized) {
+        playAudio("atmosfera.mp3", 0.5, true);
+        audioInitialized = true;
+    }
+}
+
+function waitForClick(element) {
+    return new Promise(resolve => {
+        element.addEventListener("click", () => {
+            initAmbientAudio();
+            resolve();
+        }, { once: true });
+    });
+}
+
+const itemTexts = {
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+  'flipper': "Malá krabička umožňující ovládat různá zařízení z dálky.",
+  'item616': "Zatím nepotřebuji povolat ducha Žabin. Zvládnu to sám."
+};
+
+function showModalText(key) {
+  document.getElementById('item-description-text').innerText = itemTexts[key] || key;
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+
+let outsideClickEnabled = false;
+let pulseTimer = null;
+
+window.addEventListener('DOMContentLoaded', spustitKomiks);
+
+async function spustitKomiks() {
+    const zltBbln = document.getElementById("zlt-bbln");
+    zltBbln.style.opacity = "1";
+    setTimeout(() => {
+        playAudio("harp.mp3", 0.3);
+        zltBbln.style.opacity = "0";
+    }, 1500);
+
+    const text1 = document.getElementById("text1");
+    text1.style.display = "block";
+    await waitForClick(text1);
+    text1.style.display = "none";
+
+    const bg1 = document.getElementById("bg1");
+    const bg2 = document.getElementById("bg2");
+    bg1.style.transition = "opacity 4s ease";
+    bg2.style.transition = "opacity 4s ease";
+    bg1.style.opacity = "0";
+    bg2.style.opacity = "1";
+    await wait(4000); 
+
+    const text2 = document.getElementById("text2");
+    text2.style.display = "block";
+    await waitForClick(text2);
+    text2.style.display = "none";
+
+    const mrakBuddha = document.getElementById("mrak-buddha");
+    mrakBuddha.style.opacity = "1";
+    await wait(1500); 
+    playAudio("indian-guitar3.mp3", 0.4);
+    mrakBuddha.classList.add("buddha-pulse-anim");
+    await wait(1500);
+
+    const text3 = document.getElementById("text3");
+    text3.style.display = "block";
+    await waitForClick(text3);
+    text3.style.display = "none";
+
+    mrakBuddha.style.opacity = "0";
+    await wait(1500);
+
+    const text4 = document.getElementById("text4");
+    text4.style.display = "block";
+    text4.classList.add("hint-anim");
+    playAudio("napoveda1.mp3", 0.3);
+    await wait(3500);
+
+    const text5 = document.getElementById("text5");
+    text5.style.display = "block";
+    text5.classList.add("hint-anim");
+    playAudio("napoveda2.mp3", 0.3);
+    await wait(3000);
+
+    const text6 = document.getElementById("text6");
+    text6.style.display = "block";
+    await waitForClick(text6);
+    text6.style.display = "none";
+
+    pulseTimer = setTimeout(() => {
+        document.getElementById("game-container").classList.add("pulse-yellow-active");
+    }, 10000);
+    outsideClickEnabled = true;
+}
+
+document.getElementById('outside-wrapper').addEventListener('click', async function() {
+    if (outsideClickEnabled) {
+        outsideClickEnabled = false; 
+        
+        if (pulseTimer) {
+            clearTimeout(pulseTimer);
+            pulseTimer = null;
+        }
+        
+        document.getElementById("game-container").classList.remove("pulse-yellow-active");
+        
+        this.style.display = 'none'; 
+        await runFinaleSequence();
+    }
+});
+
+async function runFinaleSequence() {
+    const cw = 2876;
+    const ch = 4004;
+    const px = 2380;
+    const py = 3611;
+    
+    const gameContainer = document.getElementById("game-container");
+    const zoomWrapper = document.getElementById("zoom-wrapper");
+    const comicLayout = document.getElementById("comic-layout");
+    
+    const scaleIn = 900 / 924; 
+    const offsetX = cw / 2 - px;
+    const offsetY = ch / 2 - py;
+    
+    comicLayout.style.transform = `translate(-50%, -50%) scale(${scaleIn}) translate(${offsetX}px, ${offsetY}px)`;
+    zoomWrapper.style.display = 'block';
+    
+    gameContainer.style.opacity = '0';
+    zoomWrapper.getBoundingClientRect();
+    
+    await wait(100);
+    
+    const scaleFit = Math.min(window.innerWidth / cw, window.innerHeight / ch) * 0.95;
+    comicLayout.style.transition = 'transform 3.5s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    comicLayout.style.transform = `translate(-50%, -50%) scale(${scaleFit}) translate(0px, 0px)`;
+    
+    await wait(4000);
+
+    const numbersData = [
+        { id: 'num1', val: 1, x: 496, y: 399 },
+        { id: 'num2', val: 2, x: 1444, y: 399 },
+        { id: 'num3', val: 3, x: 2380, y: 399 },
+        { id: 'num4', val: 4, x: 496, y: 1207 },
+        { id: 'num5', val: 5, x: 1444, y: 1207 },
+        { id: 'num6', val: 6, x: 2380, y: 1207 },
+        { id: 'num7', val: 1, x: 1444, y: 2007 },
+        { id: 'num8', val: 1, x: 496, y: 2799 },
+        { id: 'num9', val: 2, x: 1444, y: 2799 },
+        { id: 'num10', val: 3, x: 2380, y: 2799 },
+        { id: 'num11', val: 4, x: 496, y: 3611 },
+        { id: 'num12', val: 5, x: 1444, y: 3611 },
+        { id: 'num13', val: 6, x: 2380, y: 3611 }
+    ];
+    
+    numbersData.forEach(nd => {
+        let el = document.createElement('div');
+        el.id = nd.id;
+        el.className = 'comic-number';
+        el.style.left = nd.x + 'px';
+        el.style.top = nd.y + 'px';
+        el.innerText = nd.val;
+        comicLayout.appendChild(el);
+        nd.el = el;
+    });
+    
+    for (let i = 0; i < numbersData.length; i++) {
+        const nd = numbersData[i];
+        nd.el.getBoundingClientRect();
+        nd.el.style.opacity = '1';
+        playXyloTone(i);
+        await wait(350);
+    }
+    
+    await wait(1000);
+    
+    numbersData.slice(0, 6).forEach(nd => {
+        nd.el.style.left = '1444px';
+        nd.el.style.top = '803px';
+        nd.el.style.opacity = '0';
+    });
+    const mTop = document.getElementById('master-top');
+    mTop.style.opacity = '1';
+    
+    await wait(1500);
+    
+    const midOne = numbersData[6].el;
+    midOne.classList.remove('comic-number');
+    midOne.classList.add('master-number');
+    midOne.style.fontSize = '500px';
+    
+    await wait(1500);
+    
+    numbersData.slice(7, 13).forEach(nd => {
+        nd.el.style.left = '1444px';
+        nd.el.style.top = '3205px';
+        nd.el.style.opacity = '0';
+    });
+    const mBot = document.getElementById('master-bot');
+    mBot.style.opacity = '1';
+    
+    await wait(2000);
+    
+    mTop.style.top = '2007px';
+    mTop.style.left = '1164px';
+    
+    mBot.style.top = '2007px';
+    mBot.style.left = '1724px';
+    
+    await wait(1500);
+    
+    mTop.style.opacity = '0';
+    midOne.style.opacity = '0';
+    mBot.style.opacity = '0';
+    
+    const m616 = document.getElementById('master-616');
+    m616.style.display = 'block';
+    m616.getBoundingClientRect(); 
+    m616.style.opacity = '1';
+    
+    await wait(1000);
+    
+    const icon = document.getElementById('finale-616-icon');
+    icon.style.display = 'block';
+    icon.style.animation = 'blink-icon 0.25s 6 alternate ease-in-out';
+    
+    playAudio("616-connect.mp3", 0.5);
+    
+    await wait(2500); 
+    
+    m616.style.opacity = '0';
+    icon.style.opacity = '0';
+    
+    const inventory = document.getElementById('inventory');
+    const newInvIcon = document.createElement('img');
+    newInvIcon.id = 'inv-616';
+    newInvIcon.className = 'inv-item';
+    newInvIcon.src = '616-icon.png';
+    newInvIcon.alt = '616';
+    newInvIcon.onclick = () => showModalText('item616'); 
+    inventory.appendChild(newInvIcon);
+    
+    await wait(1500);
+    
+    comicLayout.style.transform = `translate(-50%, -50%) scale(${scaleIn}) translate(${offsetX}px, ${offsetY}px)`;
+    
+    await wait(3500); 
+    
+    zoomWrapper.style.opacity = '0';
+    zoomWrapper.style.transition = 'opacity 1s ease';
+    gameContainer.style.opacity = '1';
+    
+    await wait(1000);
+    zoomWrapper.style.display = 'none';
+    
+    gameContainer.classList.remove("pulse-yellow-active");
+    document.getElementById('btn-pokracovat').style.display = 'block';
+}
+</script>
+</body>
+</html>

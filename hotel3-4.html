@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Hotel</title>
+<style>
+  /* Import herního fontu použitého v minihře */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  /* Reset okrajů a nastavení box-sizingu */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow: hidden;
+  }
+
+  /* Hlavní herní kontejner s pevným rozlišením 900x768px */
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('Hotel_venek.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    transition: background-image 0.5s ease-in-out;
+  }
+
+  /* ---- INVENTÁŘ ---- */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.75);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  }
+
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    opacity: 1; /*0.3;*/
+    filter: none; /*grayscale(80%);*/
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  /* Pouze Maui ikona je aktivní */
+  .inv-item.active {
+    opacity: 1;
+    filter: none;
+    cursor: pointer;
+  }
+  .inv-item.active:hover {
+    transform: scale(1.1);
+  }
+
+  /* ---- POSTAVY (Skutečná velikost) ---- */
+  .character {
+    position: absolute;
+    z-index: 10;
+  }
+
+  #char-kolimbus {
+    left: 312px;
+    top: 425px;
+    width: auto;
+    height: auto;
+  }
+
+  /* Nová postava pro konec (pozice vpravo dole) */
+  #char-kolimbus-back {
+    display: none;
+    position: absolute;
+    left: -5px;
+    bottom: -15px;
+    z-index: 10;
+    transition: transform 0.3s ease-out;
+  }
+
+  #char-falko {
+    left: 536px;
+    top: 565px;
+    width: auto;
+    height: auto;
+    cursor: pointer; /* Kurzor ručičky pro klikatelnost */
+  }
+
+  #char-mira {
+    left: 705px;
+    top: 447px;
+    width: auto;
+    height: auto;
+  }
+
+  /* ---- OBRÁZEK VYKŘIČNÍKŮ ---- */
+  #img-vykricniky {
+    display: none;
+    position: absolute;
+    right: 280px;
+    top: 65%;
+    transform: translateY(-50%);
+    z-index: 15;
+  }
+
+  /* ---- DIALOGOVÉ BUBLINY & TEXTY ---- */
+  .bubble {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 30;
+    transition: transform 0.1s;
+  }
+  .bubble:hover {
+    transform: scale(1.02);
+  }
+
+  /* Přesné pozicování bublin nad postavami */
+  #bubble-text1 { top: 220px; left: 160px; }
+  #bubble-text2 { top: 240px; right: 60px; }
+  #bubble-text3 { top: 240px; left: 160px; }
+  #bubble-text4 { top: 220px; left: 160px; }
+  #bubble-text5 { top: 240px; right: 60px; }
+  
+  /* Pozice nových bublin pro závěr */
+  #bubble-text6 { bottom: 410px; left: 180px; }
+  #bubble-text7 { bottom: 410px; left: 200px; }
+
+  /* Žlutý úvodní text s přidaným transition efektu pro opacity */
+  #yellow-text {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 100;
+    display: block;
+    max-width: 250px;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+  }
+
+  /* ---- MODÁLNÍ OKNA ---- */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Modal pro běžný text Maui */
+  #maui-text-modal {
+    background: #2a2a2a;
+    border: 3px solid #ffcc00;
+    border-radius: 10px;
+    padding: 25px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  #maui-text-modal p {
+    font-size: 18px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    line-height: 1.4;
+  }
+  #maui-text-modal button {
+    background: #ffcc00;
+    color: #111;
+    border: none;
+    padding: 8px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  #maui-text-modal button:hover { background: #ffee55; }
+
+  /* Modal pro minihru Dog Commander */
+  #minigame-modal-content {
+    width: 560px;
+    height: 342px;
+    background: #3a3a3a;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* ---- JEDINÉ FINÁLNÍ TLAČÍTKO POKRAČOVAT V KOMIKSU ---- */
+  #btn-final-continue {
+    display: none;
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    background: #00cc44;
+    color: #fff;
+    border: none;
+    padding: 15px 35px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    z-index: 90;
+    text-transform: uppercase;
+    animation: pulse 1.5s infinite;
+  }
+  #btn-final-continue:hover {
+    background: #00ee55;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50% { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  /* ---- STYLY Z MINIHRY DOG_COMMANDER.HTML ---- */
+  #commander-panel {
+    position: relative;
+    width: 560px;
+    height: 342px;
+    background-image: url('Commander_bkg.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+  #slots-row {
+    position: absolute;
+    top: 42px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .slot-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .arrow-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #bbb;
+    font-size: 14px;
+    line-height: 1;
+    padding: 1px 4px;
+    transition: color 0.1s;
+    user-select: none;
+  }
+  .arrow-btn:hover { color: #fff; }
+  .arrow-up::before {
+    content: '';
+    display: block;
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 10px solid #999;
+  }
+  .arrow-btn.arrow-up:hover::before { border-bottom-color: #eee; }
+  .arrow-down::before {
+    content: '';
+    display: block;
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 10px solid #999;
+  }
+  .arrow-btn.arrow-down:hover::before { border-top-color: #eee; }
+  .letter-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    font-size: 26px;
+    font-weight: bold;
+    color: #111;
+    cursor: default;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.4);
+    letter-spacing: 0;
+  }
+  .color-F { background: #e02020; }
+  .color-A { background: #e87020; }
+  .color-L { background: #d4c800; }
+  .color-K { background: #28a020; }
+  .color-O { background: #2060d0; }
+  .color-E { background: #8020c0; }
+  .color-BCD { background: #7a1010; }
+  .color-GHI { background: #7a4a10; }
+  .color-JMN { background: #1a5a1a; }
+  .color-special { background: #666; color: #ddd; }
+  
+  #execute-btn {
+    position: absolute;
+    bottom: 150px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #555;
+    color: #ddd;
+    border: none;
+    padding: 8px 22px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    box-shadow: 0 3px 0 #333, 0 4px 8px rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
+  }
+  #execute-btn:hover { background: #666; }
+  #execute-btn:active {
+    transform: translateX(-50%) translateY(2px);
+    box-shadow: 0 1px 0 #333, 0 2px 4px rgba(0,0,0,0.4);
+  }
+  
+  .overlay-img {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 10;
+    max-width: 400px;
+  }
+  #overlay-spatne { top: 50%; left: 50%; transform: translate(-50%, -60%); }
+  #overlay-napoveda { top: 50%; left: 50%; transform: translate(-50%, -60%); }
+  #overlay-spravne { top: 50%; left: 50%; transform: translate(-50%, -60%); }
+  #overlay-vizitka { top: 50%; left: 50%; transform: translate(-50%, -55%); }
+  #overlay-vizitka-koment { top: 60%; left: 46%; transform: translate(-50%, -70%); }
+  #overlay-vizitka-back { top: 50%; left: 50%; transform: translate(-50%, -55%); }
+  #overlay-vizitka-koment-back { top: 60%; left: 40%; transform: translate(-50%, -70%); }
+  
+  #btn-pokracovat {
+    display: none;
+    position: absolute;
+    bottom: 20px;
+    right: 24px;
+    background: #555;
+    color: #ddd;
+    border: none;
+    padding: 10px 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    box-shadow: 0 3px 0 #333, 0 4px 8px rgba(0,0,0,0.5);
+    z-index: 20;
+    text-transform: uppercase;
+  }
+  
+  #dim-overlay-mg {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    cursor: pointer;
+    background: rgba(0,0,0,0.35);
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  
+  <img id="yellow-text" src="Zluty_text_hotel.png" alt="Před hotelem Korzár...">
+
+  <div id="inventory">
+    <img class="inv-item" src="groovie-icon.png" alt="Groovie" onclick="showItemText('groovie')">
+    <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+    <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+    <img class="inv-item" src="500-icon.png" alt="500" onclick="showItemText('500')">
+    <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+    <img class="inv-item" src="sponka-icon.png" alt="Sponka" onclick="showItemText('sponka')">
+    <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    <img class="inv-item active" id="maui-icon" src="maui-icon.png" alt="Maui">
+  </div>
+
+  <img id="char-kolimbus" class="character" src="Kolimbus_hotel.png" alt="Kolimbus">
+  <img id="char-kolimbus-back" src="Kolimbus_hotel_back.png" alt="Kolimbus zezadu">
+  <img id="char-falko" class="character" src="Falko_hotel.png" alt="Falko">
+  <img id="char-mira" class="character" src="Mira_hotel.png" alt="Mira">
+
+  <img id="img-vykricniky" src="vykricniky.png" alt="Vykřičníky">
+
+  <img id="bubble-text1" class="bubble" src="Text1_hotel.png" alt="Text 1">
+  <img id="bubble-text2" class="bubble" src="Text2_hotel.png" alt="Text 2">
+  <img id="bubble-text3" class="bubble" src="Text3_hotel.png" alt="Text 3">
+  <img id="bubble-text4" class="bubble" src="Text4_hotel.png" alt="Text 4">
+  <img id="bubble-text5" class="bubble" src="Text5_hotel.png" alt="Text 5">
+  <img id="bubble-text6" class="bubble" src="Text6_hotel.png" alt="Text 6">
+  <img id="bubble-text7" class="bubble" src="Text7_hotel.png" alt="Text 7">
+
+  <button id="btn-final-continue">Pokračovat</button>
+
+</div>
+
+<div id="modal-maui" class="modal-overlay">
+  <div id="maui-text-modal">
+    <p>Nevím co by teď Maui mohla udělat.</p>
+    <button id="btn-close-maui">Zavřít</button>
+  </div>
+</div>
+
+<div id="modal-minigame" class="modal-overlay">
+  <div id="minigame-modal-content">
+    <div id="dim-overlay-mg"></div>
+
+    <div id="commander-panel">
+      <div id="slots-row"></div>
+      <button id="execute-btn">PROVÉZT PŘÍKAZ</button>
+    </div>
+
+    <img class="overlay-img" id="overlay-spatne"             src="spatne.png"              alt="Špatně">
+    <img class="overlay-img" id="overlay-napoveda"           src="napoveda.png"            alt="Nápvěda">
+    <img class="overlay-img" id="overlay-spravne"            src="spravne.png"             alt="Správně">
+    <img class="overlay-img" id="overlay-vizitka"            src="vizitka.png"             alt="Vizitka">
+    <img class="overlay-img" id="overlay-vizitka-koment"     src="vizitka_koment.png"      alt="Vizitka komentář">
+    <img class="overlay-img" id="overlay-vizitka-back"       src="vizitka_back.png"        alt="Vizitka back">
+    <img class="overlay-img" id="overlay-vizitka-koment-back" src="vizitka_koment_back.png" alt="Vizitka komentář back">
+
+    <button id="btn-pokracovat">POKRAČOVAT</button>
+  </div>
+</div>
+
+<audio id="audio-music" loop></audio>
+<audio id="audio-ambient" loop></audio>
+<audio id="audio-sfx"></audio>
+<audio id="audio-alarm"></audio> <audio id="audio-bark"></audio>
+
+<script>
+// ── TEXTOVÉ POPISY PŘEDMĚTŮ V INVENTÁŘI (ze souboru hledani4.html) ─────────
+const itemTexts = {
+  'groovie': "Ashe zatím povolat nepotřebuju.",
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  '500': "Bonus za úspěšné hospodaření Lesů České republiky. Čuráci.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'sponka': "Hm, ta ikonka mi něco připomíná.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+  'maui': "Moje huňatá kulička. Když je napapaná. Jinak je to krvelačná bestie."
+};
+
+function showItemText(key) {
+  if (itemTexts[key]) {
+    alert(itemTexts[key]);
+  }
+}
+
+// ── HLAVNÍ GLOBÁLNÍ PROMĚNNÉ ───────────────────────────────────────────────
+let comicStep = 0;
+let mauiIsActiveTrigger = false; 
+let gamePhase = 'playing';
+const bark = document.getElementById('audio-bark');
+bark.src = 'dog_bark.mp3';
+bark.volume = 1.0;
+
+// Inicializace audia při prvním kliku (podmínka moderních prohlížečů)
+function initAudio() {
+  const music = document.getElementById('audio-music');
+  const ambient = document.getElementById('audio-ambient');
+  
+  if (!music.src) {
+    music.src = 'davic_loop.mp3';
+    music.volume = 0.25; 
+    music.play().catch(e => console.log("Audio zablokováno"));
+    
+    ambient.src = 'restaurace_loop.mp3';
+    ambient.volume = 0.75; 
+    ambient.play().catch(e => console.log("Ambient zablokován"));
+  }
+}
+
+document.addEventListener('click', initAudio, { once: true });
+
+// ── LOGIKA ŽLUTÉHO TEXTU (Postupný nájezd, zvuk a zmizení) ─────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const yellowText = document.getElementById('yellow-text');
+  
+  // Spustí plynulý nájezd (změnu opacity z 0 na 1 trvající 1.5 sekundy podle CSS)
+  setTimeout(() => {
+    yellowText.style.opacity = '1';
+  }, 100);
+
+  // Po dokončení přechodu opacity (za 1.5s) se přehraje zvuk harp.mp3
+  setTimeout(() => {
+    const sfx = document.getElementById('audio-sfx');
+    sfx.src = 'harp.mp3';
+    sfx.volume = 0.5;
+    sfx.play().catch(e => console.log("Harp zablokována"));
+  }, 1600);
+
+  // Žlutý text svítí 3 sekundy (celkem tedy 1.6s nájezd + 3s zobrazení = 4.6s)
+  setTimeout(() => {
+    // Objeví se první textová bublina
+    showBubble(1);
+    // Žlutý text začne mizet plynule dolů na 0
+    yellowText.style.opacity = '0';
+    // Po dokončení fade-outu ho schováme z toku dokumentu úplně
+    setTimeout(() => {
+      yellowText.style.display = 'none';
+    }, 1500);
+  }, 4600);
+});
+
+function showBubble(num) {
+  for (let i = 1; i <= 7; i++) {
+    const bubble = document.getElementById(`bubble-text${i}`);
+    if (bubble) bubble.style.display = 'none';
+  }
+  const targetBubble = document.getElementById(`bubble-text${num}`);
+  if (targetBubble) targetBubble.style.display = 'block';
+}
+
+// ── SEKVENCOVÁNÍ DIALOGŮ ──
+document.getElementById('bubble-text1').addEventListener('click', () => {
+  if (gamePhase === 'done') return; 
+  document.getElementById('bubble-text1').style.display = 'none';
+  comicStep = 1;
+  showBubble(2);
+});
+
+document.getElementById('bubble-text2').addEventListener('click', () => {
+  if (gamePhase === 'done') return; 
+  document.getElementById('bubble-text2').style.display = 'none';
+  comicStep = 2;
+  showBubble(3);
+});
+
+document.getElementById('bubble-text3').addEventListener('click', () => {
+  if (gamePhase === 'done') return; 
+  document.getElementById('bubble-text3').style.display = 'none';
+  comicStep = 3;
+  mauiIsActiveTrigger = true; 
+});
+
+// ── KLIKNUTÍ NA PSA FALKA (ŠTĚKÁNÍ) ──
+document.getElementById('char-falko').addEventListener('click', (e) => {
+    
+  bark.play().catch(err => console.log("Přehrání štěkotu bylo zablokováno."));
+
+  if (gamePhase === 'done') {
+    e.stopPropagation();
+    return;
+  }
+});
+
+// ── LOGIKA IKONY MAUI ──
+document.getElementById('maui-icon').addEventListener('click', function() {
+  if (gamePhase === 'done') return; 
+  if (!mauiIsActiveTrigger) {
+    document.getElementById('modal-maui').style.display = 'flex';
+  } else {
+    this.style.display = 'none'; 
+    
+    const sfx = document.getElementById('audio-sfx');
+    sfx.src = 'crazy_cat.mp3';
+    sfx.volume = 1.0;
+    sfx.play();
+    
+    sfx.onended = () => {
+      comicStep = 4;
+      showBubble(4);
+    };
+  }
+});
+
+// Vývojářská zkratka F2 pro okamžité dokončení minihry
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'F2' && document.getElementById('modal-minigame').style.display === 'flex') {
+    e.preventDefault();
+    slotValues = [...CORRECT_ANSWER]; // Nastaví správné řešení
+    buildSlots();                     // Překreslí sloty pro vizuální kontrolu
+    
+    // Spustí stejnou výherní sekvenci jako při úspěšném kliku
+    gamePhase = 'correct';
+    showMgOverlay('overlay-spravne');
+    showDimMg(onSpravneClick);
+    document.getElementById('overlay-spravne').onclick = onSpravneClick;
+  }
+});
+
+document.getElementById('btn-close-maui').addEventListener('click', () => {
+  document.getElementById('modal-maui').style.display = 'none';
+});
+
+document.getElementById('bubble-text4').addEventListener('click', () => {
+  if (gamePhase === 'done') return; 
+  document.getElementById('bubble-text4').style.display = 'none';
+  showBubble(5);
+});
+
+document.getElementById('bubble-text5').addEventListener('click', () => {
+  if (gamePhase === 'done') return; 
+  document.getElementById('bubble-text5').style.display = 'none';
+  document.getElementById('modal-minigame').style.display = 'flex'; 
+});
+
+
+// ── ZÁVĚREČNÁ SEKVENCE PO MINIHŘE ──
+document.getElementById('bubble-text6').addEventListener('click', () => {
+  // 1. Skrytí bubliny 6
+  document.getElementById('bubble-text6').style.display = 'none';
+  
+  // 2. Posun a natočení Kolimbuse vpravo dole
+  const kolimbusBack = document.getElementById('char-kolimbus-back');
+  kolimbusBack.style.transform = 'translateX(10px) rotate(5deg)';
+	
+  
+  // 3. Zobrazení vykřičníků
+	setTimeout(() => {
+    document.getElementById('img-vykricniky').style.display = 'block';
+	  
+  // Bezpečné přehrání alarmu přes vlastní dedikovaný audio element
+	const alarmAudio = document.getElementById('audio-alarm');
+	alarmAudio.src = 'alarm.mp3';
+	alarmAudio.volume = 1.0;
+	alarmAudio.play().catch(e => console.log("Alarm zablokován"));
+	}, 800);
+  
+
+  // 4. Zobrazení poslední bubliny Text7_hotel.png nad ním
+  setTimeout(() => {
+    showBubble(7);
+  }, 1000);
+});
+
+document.getElementById('bubble-text7').addEventListener('click', () => {
+  // Skrytí poslední bubliny a aktivace závěrečného pokračování
+  document.getElementById('bubble-text7').style.display = 'none';
+  document.getElementById('btn-final-continue').style.display = 'block';
+});
+
+// ── Přesměrování při kliknutí na tlačítko Pokračovat ──
+document.getElementById('btn-final-continue').addEventListener('click', () => {
+  window.location.href = 'za-hotelem.html';
+});
+
+
+// ── KÓD MINI-HRY DOG COMMANDER ──
+const CORRECT_ANSWER = ['F','A','L','K','O',':','F','L','E','K','!'];
+const SPECIAL_CHARS  = ['!', ':', '?', '*', '+', '-'];
+const LETTERS        = 'ABCDEFGHIJKLMNO'.split('');
+const SPECIAL_SLOTS = [5, 10];
+
+let slotValues = [];
+let wrongCount = 0;
+
+function getColorClass(ch) {
+  if (ch === 'F') return 'color-F';
+  if (ch === 'A') return 'color-A';
+  if (ch === 'L') return 'color-L';
+  if (ch === 'K') return 'color-K';
+  if (ch === 'O') return 'color-O';
+  if (ch === 'E') return 'color-E';
+  if ('BCD'.includes(ch)) return 'color-BCD';
+  if ('GHI'.includes(ch)) return 'color-GHI';
+  if ('JMN'.includes(ch)) return 'color-JMN';
+  return 'color-special';
+}
+
+function randomizeSlots() {
+  do {
+    slotValues = CORRECT_ANSWER.map((_, i) => {
+      if (SPECIAL_SLOTS.includes(i)) {
+        return SPECIAL_CHARS[Math.floor(Math.random() * SPECIAL_CHARS.length)];
+      } else {
+        return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+      }
+    });
+  } while (isCorrect());
+}
+
+function isCorrect() {
+  return slotValues.every((v, i) => v === CORRECT_ANSWER[i]);
+}
+
+function buildSlots() {
+  const row = document.getElementById('slots-row');
+  row.innerHTML = '';
+
+  slotValues.forEach((val, i) => {
+    const group = document.createElement('div');
+    group.className = 'slot-group';
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'arrow-btn arrow-up';
+    upBtn.addEventListener('click', () => changeSlot(i, 1));
+
+    const box = document.createElement('div');
+    box.className = 'letter-box ' + (SPECIAL_SLOTS.includes(i) ? 'color-special' : getColorClass(val));
+    box.id = 'slot-' + i;
+    box.textContent = val;
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'arrow-btn arrow-down';
+    downBtn.addEventListener('click', () => changeSlot(i, -1));
+
+    group.appendChild(upBtn);
+    group.appendChild(box);
+    group.appendChild(downBtn);
+    row.appendChild(group);
+  });
+}
+
+function changeSlot(index, dir) {
+  if (gamePhase !== 'playing') return;
+  if (SPECIAL_SLOTS.includes(index)) {
+    const list = SPECIAL_CHARS;
+    const cur = list.indexOf(slotValues[index]);
+    slotValues[index] = list[(cur + dir + list.length) % list.length];
+  } else {
+    const cur = LETTERS.indexOf(slotValues[index]);
+    slotValues[index] = LETTERS[(cur + dir + LETTERS.length) % LETTERS.length];
+    const box = document.getElementById('slot-' + index);
+    box.className = 'letter-box ' + getColorClass(slotValues[index]);
+  }
+  document.getElementById('slot-' + index).textContent = slotValues[index];
+}
+
+function showMgOverlay(id) { document.getElementById(id).style.display = 'block'; }
+function hideMgOverlay(id) { document.getElementById(id).style.display = 'none'; }
+
+function showDimMg(cb) {
+  const dim = document.getElementById('dim-overlay-mg');
+  dim.style.display = 'block';
+  dim._cb = cb;
+}
+function hideDimMg() {
+  const dim = document.getElementById('dim-overlay-mg');
+  dim.style.display = 'none';
+  dim._cb = null;
+}
+
+document.getElementById('dim-overlay-mg').addEventListener('click', function() {
+  if (this._cb) this._cb();
+});
+
+document.getElementById('execute-btn').addEventListener('click', () => {
+  if (gamePhase !== 'playing') return;
+
+  if (isCorrect()) {
+    gamePhase = 'correct';
+    bark.play();
+	showMgOverlay('overlay-spravne');
+    showDimMg(onSpravneClick);
+    document.getElementById('overlay-spravne').onclick = onSpravneClick;
+  } else {
+    wrongCount++;
+    if (wrongCount >= 3) {
+      showMgOverlay('overlay-napoveda');
+      showDimMg(onNapovedaClick);
+      document.getElementById('overlay-napoveda').onclick = onNapovedaClick;
+      wrongCount = 0;
+    } else {
+      showMgOverlay('overlay-spatne');
+      showDimMg(onSpatneClick);
+      document.getElementById('overlay-spatne').onclick = onSpatneClick;
+    }
+  }
+});
+
+function onSpatneClick() { hideMgOverlay('overlay-spatne'); hideDimMg(); }
+function onNapovedaClick() { hideMgOverlay('overlay-napoveda'); hideDimMg(); }
+
+function onSpravneClick() {
+  hideMgOverlay('overlay-spravne');
+  hideDimMg();
+  gamePhase = 'vizitka';
+  showMgOverlay('overlay-vizitka');
+  document.getElementById('overlay-vizitka').onclick = onVizitkaClick;
+  showDimMg(onVizitkaClick);
+}
+
+function onVizitkaClick() {
+  hideDimMg();
+  showMgOverlay('overlay-vizitka-koment');
+  document.getElementById('overlay-vizitka-koment').onclick = onVizitkaKomentClick;
+  showDimMg(onVizitkaKomentClick);
+}
+
+function onVizitkaKomentClick() {
+  hideMgOverlay('overlay-vizitka-koment');
+  hideMgOverlay('overlay-vizitka');
+  hideDimMg();
+  
+  gamePhase = 'vizitka_back';
+  showMgOverlay('overlay-vizitka-back'); 
+  
+  document.getElementById('overlay-vizitka-back').onclick = onVizitkaBackClick;
+  showDimMg(onVizitkaBackClick);
+}
+
+function onVizitkaBackClick() {
+  hideDimMg();
+  showMgOverlay('overlay-vizitka-koment-back'); 
+  
+  document.getElementById('overlay-vizitka-koment-back').onclick = onVizitkaKomentBackClick;
+  showDimMg(onVizitkaKomentBackClick);
+}
+
+function onVizitkaKomentBackClick() {
+  // Schováme obrázky a dim minihry
+  hideMgOverlay('overlay-vizitka-back');
+  hideMgOverlay('overlay-vizitka-koment-back');
+  hideDimMg();
+  
+  gamePhase = 'done'; 
+  
+  // Skryjeme původní dialogové bubliny
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById(`bubble-text${i}`).style.display = 'none';
+  }
+  
+  // Změna pozadí kontejneru
+  document.getElementById('game-container').style.backgroundImage = "url('Hotel_zoom.jpg')";
+  
+  // Zavřeme okno minihry
+  document.getElementById('modal-minigame').style.display = 'none';
+     
+  // Odstranění/skrytí původních herních postav a inventáře
+  document.getElementById('char-kolimbus').style.display = 'none';
+  document.getElementById('char-falko').style.display = 'none';
+  document.getElementById('char-mira').style.display = 'none';
+  document.getElementById('inventory').style.display = 'none';
+  
+  // Načtení a zobrazení zadního Kolimbuse (vpravo dole)
+  const kolimbusBack = document.getElementById('char-kolimbus-back');
+  kolimbusBack.style.display = 'block';
+  
+  // Zobrazení textové bubliny Text6_hotel.png nad ním
+  showBubble(6);
+}
+
+// Spuštění inicializace minihry na pozadí při startu
+randomizeSlots();
+buildSlots();
+</script>
+
+</body>
+</html>

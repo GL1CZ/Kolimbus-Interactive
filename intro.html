@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kolimbus – Ztracený plešbang! (Intro)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Hlavní kontejner 900x768px */
+        #game-container {
+            width: 900px;
+            height: 768px;
+            position: relative;
+            background-color: #000;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            overflow: hidden;
+        }
+
+        /* Vrstva pozadí s transformacemi */
+        #bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            transition: transform 10s linear;
+        }
+
+        /* Černý zakrývací obdélník (Cover) */
+        #cover {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 900px;
+            height: 768px;
+            background-color: #000;
+            opacity: 1;
+            transition: opacity 2s ease-in-out;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* Tlačítko Spustit intro (uprostřed) */
+        #start-intro-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 16px 32px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #e50914;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 101;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        #start-intro-btn:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            background-color: #ff0f1a;
+        }
+
+        /* Tlačítka v pravém dolním rohu */
+        .corner-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 2px solid #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 102;
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .corner-btn:hover {
+            background-color: #fff;
+            color: #000;
+        }
+
+        /* Všechny dynamicky umisťované obrázky */
+        .positioned-img {
+            position: absolute;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        /* Ovladač */
+        #img-ovladac {
+            position: absolute;
+            left: 715px;
+            top: 550px;
+            opacity: 0;
+            z-index: 80;
+            transition: left 1s ease, top 1s ease, opacity 0.3s ease;
+        }
+
+        /* TV Obrazovka a Maskování */
+        #tv-container {
+            position: absolute;
+            left: 316px;
+            top: 265px;
+            width: 270px;
+            height: 160px;
+            display: none;
+            z-index: 15;
+        }
+
+        .tv-frame {
+            width: 60%;
+            height: 70%;
+            overflow: hidden;
+            /* Maska převzatá ze specifikace a souboru orez-tv4-1.html */
+            clip-path: polygon(
+                0% 8%, 25% 5%, 50% 2%, 75% 3%, 100% 8%, 
+                97% 25%, 98% 50%, 97% 75%, 100% 92%, 
+                75% 97%, 50% 99%, 25% 97%, 0% 92%,
+                3% 75%, 2% 50%, 3% 20%
+            );
+			z-index: 15;
+        }
+
+        .tv-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+			z-index: 15;
+        }
+
+        /* Animace kamery Batman TV */
+        .batman-kamera {
+            animation: batmanKamera 17s linear forwards;
+			z-index: 15;
+        }
+
+        @keyframes batmanKamera {
+            0% {
+                transform: scale(2) translate(16%, 16%);
+            }
+            100% {
+                transform: scale(1.1) translate(0%, 0%);
+            }
+        }
+
+        /* TV - Dabič vrstvy */
+        #tv-layer-bkg {
+            position: absolute;
+            left: 312px;
+            top: 265px;
+            opacity: 0;
+            z-index: 15;
+            transition: opacity 1s ease;
+        }
+
+        #tv-layer-siluette {
+            position: absolute;
+            left: 325px;
+            top: 280px;
+            opacity: 0;
+            z-index: 16;
+            transition: opacity 1.5s ease;
+        }
+
+        #tv-layer-xicht {
+            position: absolute;
+            left: 325px;
+            top: 280px;
+            opacity: 0;
+            z-index: 17;
+            transition: opacity 1.5s ease;
+        }
+
+        #tv-layer-sum {
+            position: absolute;
+            left: 310px;
+            top: 262px;
+            opacity: 0;
+            z-index: 18;
+            transition: opacity 1s ease;
+        }
+
+        /* Žlutá kružnice (Přepadení) */
+        #magic-circle {
+            position: absolute;
+            left: 173px;  /* 423px - 250px radius */
+            top: 239px;   /* 489px - 250px radius */
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            border: 22px solid #ffeb3b;
+            box-shadow: 0 0 30px #ffeb3b, inset 0 0 30px #ffeb3b;
+            filter: blur(8px);
+            opacity: 0;
+            z-index: 50;
+            pointer-events: none;
+            transition: left 6s linear, top 6s linear, width 6s linear, height 6s linear, opacity 1s ease;
+        }
+
+        /* Bílý kruh (Vypnutí TV) */
+        #turnoff-circle {
+            position: absolute;
+            left: 377px; /* 397px - 20px radius */
+            top: 300px;  /* 320px - 20px radius */
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            opacity: 0;
+            z-index: 60;
+            pointer-events: none;
+            transition: left 1s ease-out, top 1s ease-out, width 1s ease-out, height 1s ease-out, opacity 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Pozadí -->
+        <div id="bg-layer"></div>
+
+        <!-- Černý zakrývací obdélník -->
+        <div id="cover"></div>
+
+        <!-- Tlačítko pro spuštění audio kontextu a intra -->
+        <button id="start-intro-btn">Spustit intro</button>
+
+        <!-- Tlačítka pro přeskočení / spustit hru -->
+        <button id="skip-btn" class="corner-btn">Přeskočit intro</button>
+        <button id="start-game-btn" class="corner-btn">Spustit hru</button>
+
+        <!-- TV Obrazovka -->
+        <div id="tv-container">
+            <div class="tv-frame">
+                <img id="batman-img" src="Batman-TV.png" alt="Batman TV">
+            </div>
+        </div>
+
+        <!-- Vrstvy v TV -->
+        <img id="tv-layer-bkg" src="Davic-bkg.png" alt="Davic Bkg">
+        <img id="tv-layer-siluette" src="Davic-siluette.png" alt="Davic Siluette">
+        <img id="tv-layer-xicht" src="Davic-xicht.png" alt="Davic Xicht">
+        <img id="tv-layer-sum" src="TV-sum.png" alt="TV Šum">
+
+        <!-- Ovladač -->
+        <img id="img-ovladac" src="Ovladac.png" alt="Ovladač">
+
+        <!-- Statické textové obrázky -->
+        <img id="img-patek" class="positioned-img" src="Patek.png" style="left: 30px; top: 30px; z-index: 20;" alt="Pátek">
+        <img id="img-text1" class="positioned-img" src="intro-text1.png" style="left: 86px; top: 557px; z-index: 20;" alt="Text 1">
+        <img id="img-text2" class="positioned-img" src="intro-text2.png" style="left: 126px; top: 506px; z-index: 20;" alt="Text 2">
+        <img id="img-text3" class="positioned-img" src="intro-text3.png" style="left: 320px; top: 514px; z-index: 20;" alt="Text 3">
+        <img id="img-text4" class="positioned-img" src="intro-text4.png" style="left: 278px; top: 157px; z-index: 20;" alt="Text 4">
+        <img id="img-text5" class="positioned-img" src="intro-text5.png" style="left: 272px; top: 47px; z-index: 20;" alt="Text 5">
+        <img id="img-text6" class="positioned-img" src="intro-text6.png" style="left: 376px; top: 516px; z-index: 20;" alt="Text 6">
+        <img id="img-text7" class="positioned-img" src="intro-text7.png" style="left: 264px; top: 81px; z-index: 20;" alt="Text 7">
+        <img id="img-text8" class="positioned-img" src="intro-text8.png" style="left: 353px; top: 470px; z-index: 20;" alt="Text 8">
+        <img id="img-text9" class="positioned-img" src="intro-text9.png" style="left: 277px; top: 123px; z-index: 20;" alt="Text 9">
+
+        <!-- Efektové prvky -->
+        <div id="magic-circle"></div>
+        <div id="turnoff-circle"></div>
+    </div>
+
+    <script>
+        // Správa zvuků
+        const audioRegistry = {};
+        
+        function playSound(src, volume = 1.0) {
+            const audio = new Audio(src);
+            audio.volume = volume;
+            audio.addEventListener('error', () => {
+                console.error(`[Zvuk] Nepodařilo se načíst soubor "${src}". Zkontroluj přesný název a příponu (velikost písmen je důležitá).`);
+            });
+            audio.play().catch(e => console.warn(`[Zvuk] Přehrávání "${src}" bylo zablokováno nebo selhalo:`, e));
+            audioRegistry[src] = audio;
+            return audio;
+        }
+
+        // Pomocná funkce – zaloguje do konzole, pokud se obrázek nepodaří načíst
+        // (užitečné pro odhalení překlepů/velikosti písmen v názvech souborů)
+        function checkImageLoads(src) {
+            const test = new Image();
+            test.onerror = () => console.error(`[Obrázek] Nepodařilo se načíst soubor "${src}". Zkontroluj přesný název a příponu (velikost písmen je důležitá).`);
+            test.src = src;
+        }
+
+        // Spolehlivé spuštění CSS tranzice: zaručí, že prohlížeč vykreslí
+        // počáteční stav dřív, než se nastaví cílový stav a tranzice se spustí.
+        // (offsetWidth-reflow trik na to sám nestačí, pokud se mění víc
+        // vlastností najednou na víc elementech – prohlížeč je pak umí sloučit
+        // do jednoho kroku a tranzice "přeskočí" rovnou na konec bez animace.)
+        function nextFrame() {
+            return new Promise(resolve => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            });
+        }
+
+        function stopAllAudio() {
+            Object.values(audioRegistry).forEach(audio => {
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+        }
+
+        // Pomocná funkce pro časování (Sleep)
+        let activeTimeouts = [];
+        function wait(ms) {
+            return new Promise(resolve => {
+                const id = setTimeout(resolve, ms);
+                activeTimeouts.push(id);
+            });
+        }
+
+        function clearAllTimeouts() {
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+        }
+
+        // Řízení stavu sekvence
+        let isSkipped = false;
+        let skipTimer = null;
+
+        const container = document.getElementById('game-container');
+        const cover = document.getElementById('cover');
+        const bgLayer = document.getElementById('bg-layer');
+        const startIntroBtn = document.getElementById('start-intro-btn');
+        const skipBtn = document.getElementById('skip-btn');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const imgOvladac = document.getElementById('img-ovladac');
+
+        // Funkce: Zmáčknutí tlačítka na ovladači
+        async function pressRemote() {
+            if (isSkipped) return;
+            imgOvladac.style.left = '720px';
+            imgOvladac.style.top = '560px';
+            playSound('Remote.mp3', 0.6);
+            await wait(200);
+            if (isSkipped) return;
+            imgOvladac.style.left = '715px';
+            imgOvladac.style.top = '550px';
+        }
+
+        // Detekce pohybu myši/dotyku pro zobrazení tlačítka Přeskočit intro
+        function handleUserActivity() {
+            if (isSkipped || startIntroBtn.style.display !== 'none' || startGameBtn.style.display === 'block') {
+                return;
+            }
+
+            skipBtn.style.display = 'block';
+            skipBtn.style.opacity = '1';
+
+            if (skipTimer) clearTimeout(skipTimer);
+            skipTimer = setTimeout(() => {
+                skipBtn.style.opacity = '0';
+                setTimeout(() => {
+                    if (skipBtn.style.opacity === '0') skipBtn.style.display = 'none';
+                }, 300);
+            }, 2000);
+        }
+
+        container.addEventListener('mousemove', handleUserActivity);
+        container.addEventListener('click', handleUserActivity);
+        container.addEventListener('touchstart', handleUserActivity);
+
+        // Inicializace spuštění intra
+        startIntroBtn.addEventListener('click', () => {
+            startIntroBtn.style.display = 'none';
+            runIntroSequence();
+        });
+
+        // Přeskočení intra
+        skipBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            finishIntro();
+        });
+
+        // Spuštění hry (přesměrování na mapa2-4.html)
+        startGameBtn.addEventListener('click', () => {
+            window.location.href = 'mapa2-4.html';
+        });
+
+        // Přechod do závěrečné fáze
+        function finishIntro() {
+            isSkipped = true;
+            clearAllTimeouts();
+            stopAllAudio();
+
+            // Skrytí všech dočasných prvků
+            skipBtn.style.display = 'none';
+            document.querySelectorAll('.positioned-img').forEach(img => img.style.opacity = '0');
+            document.getElementById('tv-container').style.display = 'none';
+            document.getElementById('tv-layer-bkg').style.opacity = '0';
+            document.getElementById('tv-layer-siluette').style.opacity = '0';
+            document.getElementById('tv-layer-xicht').style.opacity = '0';
+            document.getElementById('tv-layer-sum').style.opacity = '0';
+            document.getElementById('magic-circle').style.opacity = '0';
+            document.getElementById('turnoff-circle').style.opacity = '0';
+            imgOvladac.style.opacity = '0';
+
+            // Finální stav: Černý cover a tlačítko Spustit hru vpravo dole
+            cover.style.transition = 'none';
+            cover.style.opacity = '1';
+            startGameBtn.style.display = 'block';
+        }
+
+        // --- HLAVNÍ SEKVENCE INTRA ---
+async function runIntroSequence() {
+    // FÁZE 1: Úvodní logo
+    checkImageLoads('Logo.jpg');
+
+    // 1. Vypneme tranzice a okamžitě nastavíme počáteční stav:
+    //    pozadí Logo.png přiblížené na 200% a cover plně černý.
+    bgLayer.style.transition = 'none';
+    bgLayer.style.backgroundImage = "url('Logo.jpg')";
+    bgLayer.style.transform = "scale(3) translate(0%, 20%)";
+    
+	cover.style.transition = 'none';
+    cover.style.opacity = '1';
+
+    // Počkáme na vykreslení počátečního stavu prohlížečem, teprve pak
+    // nastavíme cílový stav – jinak prohlížeč obě změny sloučí a tranzice
+    // se vůbec neodehraje (obrazovka jen "přeskočí" na konec).
+    await nextFrame();
+
+    // 2. Zapneme tranzici na 10s a spustíme plynulé oddalování na 100%
+    bgLayer.style.transition = "transform 8s linear";
+    bgLayer.style.transform = "scale(1) translate(0%, 0%)";
+	
+
+    // Cover postupně zmizí během 2s a odkryje logo
+    cover.style.transition = "opacity 3s ease-in-out";
+    cover.style.opacity = '0';
+    playSound('intro.mp3', 0.8);
+
+    // Po 8 sekundách se cover začne opět objevovat (trvá 2s, dohromady přesně 10s)
+    await wait(9000);
+    if (isSkipped) return;
+
+    cover.style.opacity = '1';
+
+    await wait(3000); // Dokončení 10s hudebního doprovodu a ztmavnutí
+    if (isSkipped) return;
+
+
+    // FÁZE 2: Sestavení obrazovky
+    bgLayer.style.transition = 'none'; // Vypneme transformaci z loga
+    bgLayer.style.transform = "scale(1)";
+    bgLayer.style.backgroundImage = "url('Pokoj.jpg')";
+    
+    // Odkrytí pokoje
+    cover.style.transition = "opacity 2s ease-in-out";
+    cover.style.opacity = '0';
+    await wait(1000);
+    if (isSkipped) return;
+
+    // Zobrazení Patek.png
+    const imgPatek = document.getElementById('img-patek');
+    imgPatek.style.opacity = '1';
+    await wait(1000);
+    if (isSkipped) return;
+
+    // Přehrání harp.mp3 a mizení Patek.png
+    playSound('harp.mp3', 0.5);
+    imgPatek.style.opacity = '0';
+
+    await wait(1000);
+    if (isSkipped) return;
+
+    // ... (následuje zbytek sekvence)
+
+            // intro-text1.png
+            const imgText1 = document.getElementById('img-text1');
+            imgText1.style.opacity = '1';
+            playSound('intro-txt1.mp3', 0.5);
+
+            await wait(3500);
+            if (isSkipped) return;
+
+            // intro-text2.png
+            imgText1.style.opacity = '0';
+            const imgText2 = document.getElementById('img-text2');
+            imgText2.style.opacity = '1';
+            playSound('intro-txt2.mp3', 0.5);
+
+            await wait(7500);
+            if (isSkipped) return;
+
+            // Ovladac.png přjezd
+            imgText2.style.opacity = '0';
+            imgOvladac.style.opacity = '1';
+            imgOvladac.style.left = '715px';
+            imgOvladac.style.top = '550px';
+
+            await wait(2000); // 1s dojezd + 1s pauza
+            if (isSkipped) return;
+
+            // Zmáčknutí tlačítka na ovladači
+            await pressRemote();
+            await wait(500);
+            if (isSkipped) return;
+
+
+            // FÁZE 3: Sledování TV
+            const tvContainer = document.getElementById('tv-container');
+            const batmanImg = document.getElementById('batman-img');
+            
+            tvContainer.style.display = 'block';
+            batmanImg.classList.add('batman-kamera'); // Animace kamery
+            playSound('batman.mp3', 0.8);
+
+            // Po 15s (těsně před koncem 17s animace kamery) se zobrazí text3
+            await wait(15000);
+            if (isSkipped) return;
+
+            const imgText3 = document.getElementById('img-text3');
+            imgText3.style.opacity = '1';
+            playSound('intro-txt3.mp3', 0.5);
+
+            await wait(2000);
+            if (isSkipped) return;
+
+            imgText3.style.opacity = '0';
+            tvContainer.style.display = 'none';
+
+            // Zmáčknutí ovladače
+            await pressRemote();
+            if (isSkipped) return;
+
+            // TV Šum a zvuky
+            const tvSum = document.getElementById('tv-layer-sum');
+            tvSum.style.opacity = '1';
+            playSound('TV-noise.mp3', 0.5);
+
+            await wait(500);
+            if (isSkipped) return;
+
+            // Postupné mizení šumu a objevování Dabiče
+            tvSum.style.opacity = '0';
+            const tvBkg = document.getElementById('tv-layer-bkg');
+            const tvSiluette = document.getElementById('tv-layer-siluette');
+            
+            tvBkg.style.opacity = '1';
+            tvSiluette.style.opacity = '1';
+
+            await wait(1000);
+            if (isSkipped) return;
+
+            // intro-text4.png
+            const imgText4 = document.getElementById('img-text4');
+            imgText4.style.opacity = '1';
+            playSound('intro-txt4.mp3', 0.5);
+
+            await wait(4000);
+            if (isSkipped) return;
+
+            imgText4.style.opacity = '0';
+
+
+            // FÁZE 4: Přepadení
+            const magicCircle = document.getElementById('magic-circle');
+            magicCircle.style.opacity = '1';
+            playSound('magic.mp3', 0.5);
+
+            // Zmenšování a posun žluté kružnice během 6s
+            magicCircle.style.width = '100px';
+            magicCircle.style.height = '100px';
+            magicCircle.style.left = '350px'; // 400px - 50px radius
+            magicCircle.style.top = '252px';  // 302px - 50px radius
+
+            await wait(5000);
+            if (isSkipped) return;
+
+            magicCircle.style.opacity = '0'; // Zmizí v poslední sekundě
+
+            await wait(1000);
+            if (isSkipped) return;
+
+            // intro-text5.png
+            const imgText5 = document.getElementById('img-text5');
+            imgText5.style.opacity = '1';
+            playSound('intro-txt5.mp3', 0.5);
+
+            await wait(17000);
+            if (isSkipped) return;
+
+            // intro-text6.png
+            imgText5.style.opacity = '0';
+            const imgText6 = document.getElementById('img-text6');
+            imgText6.style.opacity = '1';
+            playSound('intro-txt6.mp3', 0.5);
+
+            await wait(5000);
+            if (isSkipped) return;
+
+            // intro-text7.png a proměna Dabiče (silueta -> xicht)
+            imgText6.style.opacity = '0';
+            const imgText7 = document.getElementById('img-text7');
+            const tvXicht = document.getElementById('tv-layer-xicht');
+
+            imgText7.style.opacity = '1';
+            playSound('intro-txt7.mp3', 0.5);
+
+            // Proměna trvá 1.5s
+            tvSiluette.style.opacity = '0';
+            tvXicht.style.opacity = '1';
+
+            await wait(8000);
+            if (isSkipped) return;
+
+            // intro-text8.png
+            imgText7.style.opacity = '0';
+            const imgText8 = document.getElementById('img-text8');
+            imgText8.style.opacity = '1';
+            playSound('intro-txt8.mp3', 0.5);
+
+            await wait(3000);
+            if (isSkipped) return;
+
+            // intro-text9.png
+            imgText8.style.opacity = '0';
+            const imgText9 = document.getElementById('img-text9');
+            imgText9.style.opacity = '1';
+            playSound('intro-txt9.mp3', 0.5);
+
+            await wait(2000);
+            if (isSkipped) return;
+
+            // Zmizení textu a Dabiče, návrat šumu
+            imgText9.style.opacity = '0';
+            tvBkg.style.opacity = '0';
+            tvXicht.style.opacity = '0';
+
+            tvSum.style.opacity = '1';
+            playSound('TV-noise.mp3', 0.5);
+
+            await wait(2000);
+            if (isSkipped) return;
+
+            // Vypnutí TV a stisknutí ovladače
+            tvSum.style.opacity = '0';
+            await pressRemote();
+            playSound('TV-turnoff.mp3', 0.5);
+
+            // Bílý kruh při vypnutí TV
+            const turnoffCircle = document.getElementById('turnoff-circle');
+            turnoffCircle.style.opacity = '1';
+            await wait(50);
+            if (isSkipped) return;
+
+            turnoffCircle.style.width = '2px';
+            turnoffCircle.style.height = '2px';
+            turnoffCircle.style.left = '396px';
+            turnoffCircle.style.top = '319px';
+
+            await wait(1000);
+            if (isSkipped) return;
+
+            turnoffCircle.style.opacity = '0';
+
+
+            // FÁZE 5: Závěr
+            await wait(2000);
+            if (isSkipped) return;
+
+            finishIntro();
+        }
+    </script>
+</body>
+</html>

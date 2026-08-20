@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Chodba</title>
+<style>
+  /* ====================================================================
+     KOLIMBUS - PANEL "CHODBA"
+     ====================================================================
+     Rozlišení panelu: 900x768px (Pevné souřadnice herní scény).
+     Responzivita pro mobilní zařízení je vyřešena pomocí CSS transform: scale()
+     na elementu #scene-wrapper. Logické souřadnice prvků zůstávají neměnné.
+     ==================================================================== */
+
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    background: #111;
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow-x: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Wrapper pro mobilní scale zajišťující správné zobrazení bez rozbití pozic */
+  #scene-wrapper {
+    position: relative;
+    width: 900px;
+    height: 768px;
+    transform: scale(var(--mb-scale, 1));
+    transform-origin: top center;
+  }
+
+  /* Hlavní herní kontejner s fixním rozlišením 900x768px */
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('Chodba-bkg.jpg'); /* Pozadí panelu */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  /* Obecná třída pro statické obrázkové assety hry */
+  .game-asset {
+    position: absolute;
+    display: block;
+    user-select: none;
+  }
+
+  /* --- Sestavení scény a z-indexy --- */
+  #img-tabulka {
+    left: 135px; top: 148px;
+    z-index: 10;
+    cursor: default;
+    pointer-events: none; /* Aktivuje se až po skončení dialogu */
+  }
+  #img-tabulka.active {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  #img-kolimbus {
+    left: 134px; top: 291px;
+    z-index: 15;
+    /* Plynulá transformace pro animaci odsunu při neúspěchu */
+    transition: left 6s linear, opacity 6s linear;
+  }
+
+  #img-daliboh {
+    left: 466px; top: 272px;
+    z-index: 15;
+  }
+
+  /* Univerzální klikací textové bubliny */
+  .bubble-text {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 100;
+    transition: transform 0.1s;
+  }
+  .bubble-text:hover {
+    transform: scale(1.02);
+  }
+
+  /* --- INVENTÁŘ (Zkopírován z recepce2.html bez 500-icon.png) --- */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  /* --- MODÁLNÍ OKNO MINIHRY HLEDÁNÍ HESLA --- */
+  #modal-tabulka-game {
+    position: absolute;
+    display: none; /* Zobrazeno přes JS */
+    left: 50%;
+    top: 50%;
+    width: 723px;
+    height: 582px;
+    transform: translate(-50%, -50%);
+    background-color: #888888; /* Šedý obdélník */
+    border-radius: 20px;       /* Zaoblené rohy */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    z-index: 200;
+    user-select: none;
+  }
+
+  #modal-tabulka-game.visible {
+    display: block;
+  }
+
+  /* Velký obrázek periodické tabulky uprostřed, 30px od horního okraje */
+  #img-tabulka-big {
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: block;
+  }
+
+  /* Klikací neviditelné zóny pro jednotlivé chemické prvky */
+  .click-zone {
+    position: absolute;
+    cursor: pointer;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0);
+    transition: background-color 0.2s;
+  }
+  .click-zone:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+  .click-zone.disabled {
+    pointer-events: none;
+  }
+
+  /* Přesné absolutní souřadnice divů prvků uvnitř modálu */
+  .zone-s  { left: 557px; top: 185px; width: 42px; height: 42px; }
+  .zone-la { left: 137px; top: 394px; width: 42px; height: 42px; }
+  .zone-ni { left: 356px; top: 212px; width: 42px; height: 42px; }
+  .zone-na { left: 70px; top: 182px; width: 42px; height: 42px; }
+
+  /* Spodní panel s nápisem HESLO a sloty umístěný pod tabulkou (20px od spodu) */
+  .bottom-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    color: #000; /* Černý nápis */
+  }
+
+  .label {
+    font-weight: bold;
+    font-size: 28px;
+    letter-spacing: 1px;
+  }
+
+  /* Rámečky na čtvercové sloty pro písmena */
+  .slots-container {
+    display: grid;
+    grid-template-columns: repeat(4, 50px);
+    gap: 10px;
+  }
+
+  .slot {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #000;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 22px;
+    background-color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+  }
+
+  /* Barevné stavy pro vizualizaci úspěchu a selhání */
+  .slot.success { border-color: #27ae60; color: #27ae60; background-color: rgba(39, 174, 96, 0.2); }
+  .slot.fail { border-color: #c0392b; color: #c0392b; background-color: rgba(192, 41, 43, 0.2); }
+
+  /* --- TLAČÍTKO POKRAČOVAT (Pulzující) --- */
+  #btn-pokracovat {
+    position: absolute;
+    right: 40px;
+    bottom: 40px;
+    display: none;
+    z-index: 300;
+    padding: 15px 40px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #111;
+    background: #00cc44;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    animation: pulse-continue 1.4s infinite ease-in-out;
+  }
+
+  @keyframes pulse-continue {
+    0%   { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50%  { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1);    box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  @media (max-width: 920px) {
+    body { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-wrapper">
+  <div id="game-container">
+
+    <img id="img-tabulka" class="game-asset" src="tabulka.png" alt="Tabulka" onclick="clickTabulka()">
+    <img id="img-kolimbus" class="game-asset" src="Chdb-Kolimbus1.png" alt="Kolimbus">
+    <img id="img-daliboh" class="game-asset" src="Daliboh.png" alt="Daliboh">
+
+    <img id="active-text" class="bubble-text" src="" alt="Dialog" onclick="closeActiveText()">
+
+    <div id="inventory">
+      <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+      <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+      <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+      <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    </div>
+
+    <div id="modal-tabulka-game">
+      <img id="img-tabulka-big" src="tabulka-big.png" alt="Periodická tabulka prvků">
+      
+      <div class="click-zone zone-s" data-id="1" data-symbol="S"></div>
+      <div class="click-zone zone-la" data-id="2" data-symbol="La"></div>
+      <div class="click-zone zone-ni" data-id="3" data-symbol="Ni"></div>
+      <div class="click-zone zone-na" data-id="4" data-symbol="Na"></div>
+
+      <div class="bottom-panel">
+        <div class="label">HESLO:</div>
+        <div class="slots-container">
+          <div class="slot" id="slot-0"></div>
+          <div class="slot" id="slot-1"></div>
+          <div class="slot" id="slot-2"></div>
+          <div class="slot" id="slot-3"></div>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-pokracovat" onclick="window.location.href='pokoj33-3.html'">Pokračovat.</button>
+
+  </div>
+</div>
+
+<div id="modal-item-text" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:600; display:none; justify-content:center; align-items:center;">
+  <div style="background:#2a2a2a; border:3px solid #00cc44; border-radius:10px; padding:25px; text-align:center; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+    <p id="item-description-text" style="font-size:18px; margin-bottom:20px; letter-spacing:1px; line-height:1.4; color:#fff;"></p>
+    <button onclick="closeItemModal()" style="background:#00cc44; color:#111; border:none; padding:8px 20px; font-family:'Share Tech Mono', monospace; font-size:14px; font-weight:bold; cursor:pointer; border-radius:4px; text-transform:uppercase;">Zavřít</button>
+  </div>
+</div>
+
+<audio id="audio-hurikan-loop" src="Hurikan-smycka.mp3"></audio>
+<audio id="audio-vitr"         src="vitr.mp3"></audio>
+<audio id="audio-hurikan-fail" src="Hurikan-fail.mp3"></audio>
+
+<script>
+/* ==========================================================================
+   HLAVNÍ HERNÍ LOGIKA PANELU CHODBA
+   ========================================================================== */
+
+/* ---- RESPONZIVNÍ SCALE PRO MOBILNÍ TELEFONY ---- */
+function updateMobileScale() {
+  const SCENE_WIDTH = 900;
+  const viewportWidth = window.innerWidth;
+  let scale = 1;
+  if (viewportWidth < SCENE_WIDTH) {
+    scale = viewportWidth / SCENE_WIDTH;
+  }
+  document.documentElement.style.setProperty('--mb-scale', scale);
+  const wrapper = document.getElementById('scene-wrapper');
+  wrapper.style.marginBottom = (768 * scale - 768) + 'px';
+}
+window.addEventListener('resize', updateMobileScale);
+window.addEventListener('DOMContentLoaded', updateMobileScale);
+
+
+/* ---- HLAVNÍ STAVOVÉ PROMĚNNÉ ---- */
+let currentPhase = "Init"; // Fáze hry: Init -> Dialog -> MinihraReady -> Minihra
+let tabulkaClicks = 0;     // Čítač kliknutí na tabulka.png
+let dialogStep = 0;        // Krok v sekvenci úvodního dialogu
+let onDialogClose = null;  // Callback funkce po zavření bubliny
+
+// Minihra - proměnné
+let clickedSequence = [];
+const maxClicks = 4;
+const zones = document.querySelectorAll('.click-zone');
+const slots = document.querySelectorAll('.slot');
+
+
+/* ---- AUDIO HANDLERY ---- */
+let hurikanLoopAudio = document.getElementById('audio-hurikan-loop');
+let vitrAudio = document.getElementById('audio-vitr');
+let hurikanFailAudio = document.getElementById('audio-hurikan-fail');
+
+// Spuštění smyčky hurikánu na 30% volume po prvním interaktivním kliku hráče (Autoplay bypass)
+document.addEventListener('click', function initBGM() {
+  if (currentPhase !== "FailAnimation" && hurikanLoopAudio.paused) {
+    hurikanLoopAudio.loop = true;
+    hurikanLoopAudio.volume = 0.30;
+    hurikanLoopAudio.play().catch(e => console.log('Audio čeká na plnou interakci.'));
+  }
+}, { once: false });
+
+function stopAudio(audioEl) {
+  audioEl.pause();
+  audioEl.currentTime = 0;
+}
+
+
+/* ---- DIALOGOVÝ SYSTÉM ---- */
+function showBubble(imgSrc, x, y, callback) {
+  const bubble = document.getElementById('active-text');
+  bubble.src = imgSrc;
+  bubble.style.left = `${x}px`;
+  bubble.style.top = `${y}px`;
+  bubble.style.display = 'block';
+  onDialogClose = callback;
+}
+
+function closeActiveText() {
+  const bubble = document.getElementById('active-text');
+  bubble.style.display = 'none';
+  const cb = onDialogClose;
+  onDialogClose = null;
+  if (cb) cb();
+}
+
+
+/* ---- 1) SPUŠTĚNÍ SCÉNY A DIALOGU ---- */
+window.addEventListener('DOMContentLoaded', () => {
+  currentPhase = "Dialog";
+  // Spuštění lineární sekvence úvodního rozhovoru
+  runDialogSequence();
+});
+
+function runDialogSequence() {
+  dialogStep = 1;
+  // Krok 1: text1 na pozici 578, 136px
+  showBubble('chodba-text1.png', 578, 136, () => {
+    dialogStep = 2;
+    // Krok 2: text2 na pozici 218, 125px
+    showBubble('chodba-text2.png', 218, 125, () => {
+      dialogStep = 3;
+      // Krok 3: text3 na pozici 593, 174px
+      showBubble('chodba-text3.png', 593, 174, () => {
+        // Konec fáze dialogu -> Přejdeme do přípravy minihry a aktivujeme malou tabulku
+        currentPhase = "MinihraReady";
+        document.getElementById('img-tabulka').classList.add('active');
+      });
+    });
+  });
+}
+
+
+/* ---- 2) INTERAKCE S TABULKOU (NÁPOVĚDA A MINIHRA) ---- */
+function clickTabulka() {
+  if (currentPhase !== "MinihraReady") return;
+
+  tabulkaClicks++;
+
+  if (tabulkaClicks === 1) {
+    // První kliknutí: Zobrazí se nápověda chodba-text6.png na pozici 195, 126px
+    showBubble('chodba-text6.png', 195, 126, null);
+  } else if (tabulkaClicks === 2) {
+    // Druhé kliknutí: Spustí se samotná minihra a otevře se modál
+    currentPhase = "Minihra";
+    document.getElementById('modal-tabulka-game').classList.add('visible');
+    resetMinihraState();
+  }
+}
+
+
+/* ---- 3) LOGIKA MINIHRY HLEDÁNÍ HESLA ---- */
+zones.forEach(zone => {
+  zone.addEventListener('click', () => {
+    if (clickedSequence.length >= maxClicks || zone.classList.contains('disabled')) return;
+
+    // Vizuální zamknutí kliknuté zóny
+    zone.classList.add('disabled');
+
+    const id = parseInt(zone.getAttribute('data-id'));
+    const symbol = zone.getAttribute('data-symbol');
+
+    clickedSequence.push({ id, symbol });
+
+    // Vykreslení chemické značky do odpovídajícího spodního slotu
+    const currentSlotIndex = clickedSequence.length - 1;
+    slots[currentSlotIndex].textContent = symbol;
+
+    // Pokud hráč zaplnil všechny 4 sloty, vyhodnotíme pořadí prvků
+    if (clickedSequence.length === maxClicks) {
+      // Kontrola, zda jdou data-id správně chronologicky po sobě (1, 2, 3, 4) -> S, La, Ni, Na
+      const isCorrect = clickedSequence.every((item, index) => item.id === index + 1);
+      
+      setTimeout(() => {
+        evaluateMinihra(isCorrect);
+      }, 400);
+    }
+  });
+});
+
+// Vyhodnocení výsledku minihry
+function evaluateMinihra(isSuccess) {
+  if (isSuccess) {
+    // --- ÚSPĚCH ---
+    slots.forEach(slot => slot.classList.add('success'));
+    
+    // Zavření modálu
+    document.getElementById('modal-tabulka-game').classList.remove('visible');
+    
+    // Sekvence úspěšných textových bublin
+    showBubble('chodba-text4.png', 225, 185, () => {
+      showBubble('chodba-text5.png', 527, 108, () => {
+        // Zobrazení závěrečného pulzujícího tlačítka vpravo dole
+        document.getElementById('btn-pokracovat').style.display = 'block';
+        currentPhase = "Závěr";
+      });
+    });
+  } else {
+    // --- NEÚSPĚCH ---
+    slots.forEach(slot => slot.classList.add('fail'));
+    
+    // Fáze animace selhání
+    currentPhase = "FailAnimation";
+    
+    // 1. Modální okno se okamžitě zavře
+    document.getElementById('modal-tabulka-game').classList.remove('visible');
+    
+    // 2. Zastavení hlavní smyčky hurikánu
+    stopAudio(hurikanLoopAudio);
+    
+    // 3. Spuštění efektových zvuků
+    vitrAudio.volume = 0.40;
+    vitrAudio.loop = false;
+    vitrAudio.play();
+    
+    hurikanFailAudio.volume = 0.50;
+    hurikanFailAudio.loop = false;
+    hurikanFailAudio.play();
+    
+    // 4. Vizuální změna Kolimbuse a animace odsunu doleva mimo obrazovku
+    const kolimbusImg = document.getElementById('img-kolimbus');
+    kolimbusImg.src = "Chdb-Kolimbus2.png";
+    kolimbusImg.style.transition = "left 6s linear, opacity 6s linear"; // Ujištění, že odsun trvá 6s
+    kolimbusImg.style.left = "-300px"; 
+    kolimbusImg.style.opacity = "1";
+    
+    // 5. Po 6 sekundách (kdy Kolimbus zmizel a zvuky dozněly) se resetuje scéna s dvojitým zablikáním
+    setTimeout(() => {
+      // Vypneme transition, aby se Kolimbus vrátil na startovní pozici okamžitě a neplynule
+      kolimbusImg.style.transition = "none";
+      kolimbusImg.src = "Chdb-Kolimbus1.png";
+      kolimbusImg.style.left = "134px";
+      kolimbusImg.style.opacity = "1";
+      
+      // Spuštění efektu dvojitého zablikání (každý krok po 150ms)
+      setTimeout(() => { kolimbusImg.style.opacity = "0"; }, 150);
+      setTimeout(() => { kolimbusImg.style.opacity = "1"; }, 300);
+      setTimeout(() => { kolimbusImg.style.opacity = "0"; }, 450);
+      setTimeout(() => { kolimbusImg.style.opacity = "1"; }, 600);
+      
+      // Reset počítadla kliků tabulky a obnovení herní fáze
+      tabulkaClicks = 1; 
+      currentPhase = "MinihraReady";
+      
+      // Znovu spuštění hlavní smyčky hurikánu
+      hurikanLoopAudio.play();
+    }, 6000);
+  }
+}
+
+// Vyčištění stavu minihry před novým pokusem
+function resetMinihraState() {
+  clickedSequence = [];
+  slots.forEach(slot => {
+    slot.textContent = '';
+    slot.classList.remove('fail', 'success');
+  });
+  zones.forEach(zone => {
+    zone.classList.remove('disabled');
+  });
+}
+
+
+/* ---- INVENTÁŘOVÝ POMOCNÝ SYSTÉM ---- */
+const itemTexts = {
+  'autoplay': "Tohle si schovám až na velké finále.",
+  'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+  'joint': "Zhulím se až později, až všechno vyřídím.",
+  'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí."
+};
+
+function showItemText(key) {
+  // Během fail animace blokujeme zobrazení popisků
+  if (currentPhase === "FailAnimation") return;
+  document.getElementById('item-description-text').innerText = itemTexts[key] || '';
+  document.getElementById('modal-item-text').style.display = 'flex';
+}
+
+function closeItemModal() {
+  document.getElementById('modal-item-text').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

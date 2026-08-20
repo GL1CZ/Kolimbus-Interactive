@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kolimbus a Ztracený Plešbang - Hlavní Menu</title>
+    <style>
+        /* ==========================================================================
+           ZÁKLADNÍ STYLOVÁNÍ STRÁNKY A STRUKTURY
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Zamezení náhodného výběru textu v herním menu */
+        }
+
+        body {
+            background-color: #0e0e0e;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        /* ==========================================================================
+           HERNÍ KONTEJNER (900x768px dle specifikace)
+           ========================================================================== */
+        #game-container {
+            position: relative;
+            width: 900px;
+            height: 768px;
+            background-color: #000000;
+            /* Načtení obrázku pozadí menu-bkg.jpg s fallbackem na radiální přechod */
+            background-image: url('menu-bkg.jpg'), radial-gradient(circle at center, #d8ee31 0%, #8ca614 22%, #3a4208 50%, #111403 75%, #000000 100%);
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 0 35px rgba(0, 0, 0, 0.9);
+            overflow: hidden;
+            border: 2px solid #222222;
+        }
+
+        /* ==========================================================================
+           VRSTVA CANVAS PRO ANIMACI (Umístěna pod tlačítky a nápisy)
+           ========================================================================== */
+        #anim-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 900px;
+            height: 768px;
+            z-index: 10; /* Vyšší než pozadí, nižší než UI prvky */
+            pointer-events: none; /* Snímání kliknutí prochází na prvky pod/nad canvasem */
+            filter: blur(7px); /* Dodatečné rozmazání dle specifikace */
+        }
+
+        /* ==========================================================================
+           VRSTVA UŽIVATELSKÉHO ROZHRANÍ (UI - Tlačítka a nápisy)
+           ========================================================================== */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20; /* Nad animovaným canvasem */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 45px 20px 30px 20px;
+            text-align: center;
+        }
+
+        /* Hlavní název hry */
+        .game-title {
+            font-size: 46px;
+            letter-spacing: 2.5px;
+            color: #ffffff;
+            text-transform: uppercase;
+            text-shadow: 0px 4px 10px rgba(0, 0, 0, 0.85), 0px 0px 15px rgba(0, 0, 0, 0.6);
+            margin-top: 10px;
+        }
+
+        /* Skupina tlačítek uprostřed */
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Tlačítka v menu */
+        .menu-btn {
+            width: 250px;
+            height: 64px;
+            background-color: #8cc63f; /* Zelenkavě žlutá dle podkladu */
+            border: 2px solid #1a1a1a;
+            border-radius: 12px;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 24px;
+            letter-spacing: 1px;
+            color: #000000;
+            cursor: pointer;
+            box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.5), inset 0px 1px 2px rgba(255, 255, 255, 0.4);
+            transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-transform: uppercase;
+        }
+
+        .menu-btn:hover {
+            background-color: #a0d84d;
+            transform: scale(1.04);
+            box-shadow: 0px 8px 18px rgba(0, 0, 0, 0.6), 0px 0px 15px rgba(216, 238, 49, 0.5);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.98);
+            box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Nápis Copyrightu dole */
+        .copyright {
+            font-size: 15px;
+            letter-spacing: 1.5px;
+            color: #ffffff;
+            text-transform: uppercase;
+            text-shadow: 0px 2px 6px rgba(0, 0, 0, 0.9);
+            margin-bottom: 5px;
+        }
+
+        /* ==========================================================================
+           MODÁLNÍ OKNO PRO INICIALIZACI ZVUKU
+           ========================================================================== */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 100; /* Zobrazuje se zcela nahoře nad scénou */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #1a1a1a;
+            border: 3px solid #8cc63f;
+            border-radius: 16px;
+            padding: 35px 50px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(140, 198, 63, 0.3), 0 10px 25px rgba(0, 0, 0, 0.8);
+            max-width: 420px;
+            width: 85%;
+        }
+
+        .modal-title {
+            font-size: 32px;
+            color: #ffffff;
+            margin-bottom: 10px;
+            letter-spacing: 1.5px;
+        }
+
+        .modal-version {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 18px;
+            color: #aaaaaa;
+            margin-bottom: 25px;
+        }
+
+        .modal-btn {
+            width: 130px;
+            height: 48px;
+            background-color: #8cc63f;
+            border: 2px solid #000;
+            border-radius: 8px;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 20px;
+            color: #000;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-btn:hover {
+            background-color: #a0d84d;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ==========================================================================
+         HLAVNÍ HERNÍ KONTEJNER (900x768px)
+         ========================================================================== -->
+    <div id="game-container">
+
+        <!-- Plátno Canvas pro animaci zmenšující se žluté kružnice -->
+        <canvas id="anim-canvas" width="900" height="768"></canvas>
+
+        <!-- Vrstva uživatelského rozhraní s titulky a tlačítky -->
+        <div id="ui-layer">
+            <!-- Nápis nahoře uprostřed -->
+            <h1 class="game-title">KOLIMBUS A ZTRACENÝ PLEŠBANG</h1>
+
+            <!-- Tlačítka uprostřed kontejneru -->
+            <div class="button-group">
+                <button id="btn-intro" class="menu-btn">PŘEHRÁT INTRO</button>
+                <button id="btn-start" class="menu-btn">SPUSTIT HRU</button>
+            </div>
+
+            <!-- Nápis dole uprostřed -->
+            <footer class="copyright">
+                COPYRIGHT (C) 2026, KOLIMBUS INTERACTIVE
+            </footer>
+        </div>
+
+        <!-- Modální okno vyžadované pro inicializaci zvuku (prochází omezení prohlížečů ohledně Autoplay) -->
+        <div id="init-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h2 class="modal-title">Kolimbus Interactive</h2>
+                <p class="modal-version">verze 1.0</p>
+                <button id="btn-modal-ok" class="modal-btn">OK</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==========================================================================
+         JAVASCRIPT LOGIKA A HANDLERY
+         ========================================================================== -->
+    <script>
+        /**
+         * Trída AudioHandler
+         * Správa audio stopy pozadí ("Saviour of the Universe.mp3") s nastavením hlasitosti a smyčky.
+         */
+        class AudioHandler {
+            /**
+             * @param {string} audioSrc - Cesta ke zvukovému souboru.
+             * @param {number} volume - Hlasitost zvuku v rozmezí 0.0 až 1.0 (80% = 0.8).
+             * @param {boolean} loop - Zda má zvuk hrát ve smyčce.
+             */
+            constructor(audioSrc, volume = 0.8, loop = true) {
+                this.src = audioSrc;
+                this.volume = volume;
+                this.loop = loop;
+                this.audioElement = null;
+                this.isInitialized = false;
+            }
+
+            /**
+             * Inicializuje audio objekt po prvním uživatelském gestu.
+             */
+            init() {
+                if (this.isInitialized) return;
+                
+                this.audioElement = new Audio(this.src);
+                this.audioElement.loop = this.loop;
+                this.audioElement.volume = this.volume;
+                this.isInitialized = true;
+            }
+
+            /**
+             * Spustí přehrávání zvuku pozadí.
+             */
+            play() {
+                if (!this.isInitialized) {
+                    this.init();
+                }
+                
+                this.audioElement.play().catch(error => {
+                    console.warn("Autoplay nebo přehrávání audia selhalo:", error);
+                });
+            }
+
+            /**
+             * Pozastaví přehrávání zvuku.
+             */
+            pause() {
+                if (this.audioElement) {
+                    this.audioElement.pause();
+                }
+            }
+
+            /**
+             * Nastaví novou hlasitost.
+             * @param {number} val - Hodnota hlasitosti (0.0 až 1.0).
+             */
+            setVolume(val) {
+                this.volume = Math.max(0, Math.min(1, val));
+                if (this.audioElement) {
+                    this.audioElement.volume = this.volume;
+                }
+            }
+        }
+
+        /**
+         * Třída MenuAnimation
+         * Správa ayklické animace zmenšující se žluté rozmazané kružnice na plátně Canvas.
+         */
+        class MenuAnimation {
+            /**
+             * @param {string} canvasId - ID elementu canvas.
+             */
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.width = this.canvas.width;
+                this.height = this.canvas.height;
+                this.centerX = this.width / 2; // Střed kontejneru X (450px)
+                this.centerY = this.height / 2; // Střed kontejneru Y (384px)
+
+                // Vypočtení úhlopříčky k rohu: sqrt(450^2 + 384^2) ≈ 591.5px.
+                // Počáteční poloměr volíme 620px, aby byla kružnice zpočátku zcela mimo kontejner.
+                this.maxRadius = Math.sqrt(this.centerX * this.centerX + this.centerY * this.centerY) + 30;
+                this.radius = this.maxRadius;
+                this.speed = 1.2; // Rychlost zmenšování (px za snímek)
+                this.lineWidth = 18; // Tloušťka čáry 6px dle zadání
+                this.isRunning = false;
+                this.animFrameId = null;
+            }
+
+            /**
+             * Spustí animaci v plynulé smyčce.
+             */
+            start() {
+                if (this.isRunning) return;
+                this.isRunning = true;
+                this.loop();
+            }
+
+            /**
+             * Zastaví animaci.
+             */
+            stop() {
+                this.isRunning = false;
+                if (this.animFrameId) {
+                    cancelAnimationFrame(this.animFrameId);
+                }
+            }
+
+            /**
+             * Jednotlivý krok animační smyčky.
+             */
+            loop() {
+                if (!this.isRunning) return;
+
+                // Vyčištění plátna před novým vykreslením
+                this.ctx.clearRect(0, 0, this.width, this.height);
+
+                // Vykreslení žluté rozmazané kružnice
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
+                this.ctx.strokeStyle = '#ffff00'; // Žlutá barva kružnice
+                this.ctx.lineWidth = this.lineWidth;
+                this.ctx.shadowColor = '#ffff00';
+                this.ctx.shadowBlur = 10; // Rozostření záře na plátně
+                this.ctx.stroke();
+                this.ctx.restore();
+
+                // Postupné zmenšování poloměru směrem ke středu
+                this.radius -= this.speed;
+
+                // Jakmile kružnice dosáhne středu (zmizí), restartuje se od okrajů
+                if (this.radius <= 0) {
+                    this.radius = this.maxRadius;
+                }
+
+                // Vyžádání dalšího snímku animace
+                this.animFrameId = requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        // ==========================================================================
+        // INICIALIZACE A PROPOJENÍ UDÁLOSTÍ PO NAČTENÍ DOM
+        // ==========================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Vytvoření instancí handlerů
+            // Audio: "Saviour of the Universe.mp3", Hlasitost 80% (0.8), Smyčka true
+            const bgAudio = new AudioHandler('Saviour of the Universe.mp3', 0.8, true);
+            
+            // Animace kružnice na Canvasu
+            const menuAnim = new MenuAnimation('anim-canvas');
+
+            // Reference na DOM prvky
+            const initModal = document.getElementById('init-modal');
+            const btnModalOk = document.getElementById('btn-modal-ok');
+            const btnIntro = document.getElementById('btn-intro');
+            const btnStart = document.getElementById('btn-start');
+
+            /**
+             * Potvrzení v modálním okně OK
+             * Zavře modal, spustí zvuk na pozadí a zahájí animaci kružnice.
+             */
+            btnModalOk.addEventListener('click', () => {
+                // Skrytí modálního okna
+                initModal.style.display = 'none';
+
+                // Inicializace a spustění hudby
+                bgAudio.play();
+
+                // Spuštění animace kružnice
+                menuAnim.start();
+            });
+
+            /**
+             * Tlačítko "PŘEHRÁT INTRO"
+             * Presměruje uživatele na externí soubor "intro.html".
+             */
+            btnIntro.addEventListener('click', () => {
+                window.location.href = 'intro.html';
+            });
+
+            /**
+             * Tlačítko "SPUSTIT HRU"
+             * Presměruje uživatele na externí soubor "mapa2-4.html".
+             */
+            btnStart.addEventListener('click', () => {
+                window.location.href = 'mapa2-4.html';
+            });
+        });
+    </script>
+</body>
+</html>

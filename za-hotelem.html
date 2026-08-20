@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolimbus Interaktiv - Za hotelem</title>
+<style>
+  /* Import herních fontů */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  /* Reset okrajů a nastavení box-sizingu */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+    color: #fff;
+    overflow: hidden;
+  }
+
+  /* Hlavní herní kontejner s pevným rozlišením 900x768px */
+  #game-container {
+    width: 900px;
+    height: 768px;
+    background-image: url('Za_hotelem.jpg'); /* Pozadí scény */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  }
+
+  /* ---- INVENTÁŘ ---- */
+  #inventory {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: flex;
+    gap: 12px;
+    z-index: 50;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+
+  .inv-item {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+  .inv-item:hover {
+    transform: scale(1.1);
+  }
+
+  /* Skrytá ikona slivovice, která přibude po minihře */
+  #slivovice-icon {
+    display: none; 
+  }
+
+  /* ---- PŘEDMĚTY A POSTAVY ---- */
+  .game-asset {
+    position: absolute;
+  }
+
+  #slivovice-world {
+    left: 235px;
+    top: 669px;
+    z-index: 5;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  #slivovice-world:hover {
+    transform: scale(1.05);
+  }
+
+  #char-vitamvas {
+    left: 151px;
+    top: 451px;
+    z-index: 10;
+  }
+
+  #char-kolimbus {
+    left: 423px;
+    top: 482px;
+    z-index: 10;
+  }
+
+  /* ---- DIALOGOVÉ BUBLINY ---- */
+  .bubble {
+    position: absolute;
+    display: none;
+    cursor: pointer;
+    z-index: 30;
+    transition: transform 0.1s;
+  }
+  .bubble:hover {
+    transform: scale(1.02);
+  }
+
+  /* ---- MODÁLNÍ OKNA (Inventář & Minihra) ---- */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 200;
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Styl pro textový modal předmětů */
+  .text-modal-content {
+    background: #2a2a2a;
+    border: 3px solid #ffcc00;
+    border-radius: 10px;
+    padding: 25px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  .text-modal-content p {
+    font-size: 18px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    line-height: 1.4;
+  }
+  .text-modal-content button {
+    background: #ffcc00;
+    color: #111;
+    border: none;
+    padding: 8px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .text-modal-content button:hover { background: #ffee55; }
+
+  /* ---- IMPLEMENTACE MINIHRY ---- */
+  #quiz-card {
+    width: 320px;
+    background: #e4d5b1;
+    border: 3px solid #111;
+    border-radius: 15px;
+    padding: 20px;
+    color: #111;
+    font-family: 'Arial', sans-serif;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    position: relative;
+    user-select: none;
+  }
+
+  #quiz-header {
+    text-align: center;
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+
+  #quiz-question {
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+  }
+
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .quiz-option {
+    padding: 10px 15px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: background 0.2s;
+  }
+
+  /* Zelený ukazatel aktivního výběru */
+  .quiz-option.highlighted {
+    background: #24cc39;
+    color: #000;
+    font-weight: bold;
+  }
+
+  /* ---- TLAČÍTKO POKRAČOVAT (Závěr scény) ---- */
+  #btn-final-continue {
+    display: none;
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    background: #00cc44;
+    color: #fff;
+    border: none;
+    padding: 15px 35px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,204,68,0.4);
+    z-index: 90;
+    text-transform: uppercase;
+    animation: pulse 1.5s infinite;
+  }
+  #btn-final-continue:hover {
+    background: #00ee55;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+    50% { transform: scale(1.06); box-shadow: 0 5px 25px rgba(0,204,68,0.8); }
+    100% { transform: scale(1); box-shadow: 0 5px 15px rgba(0,204,68,0.4); }
+  }
+
+  /* ---- STRUKTURA PRO ANIMACE ODLETU / CHYBY ---- */
+  .animated-wrapper {
+    position: absolute;
+    pointer-events: none;
+    display: none;
+  }
+
+  /* Klíčové snímky pro nelineární odlet Kolimbuse (chyba vpravo nahoru) */
+  @keyframes flyAwayRight {
+    0% {
+      transform: translate(0, 0);
+    }
+    66% {
+      transform: translate(250px, -200px);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(550px, -600px);
+      opacity: 0;
+    }
+  }
+
+  /* Lineární stín jedoucí doprava */
+  @keyframes shadowRight {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(500px, 0); opacity: 0; }
+  }
+
+  /* Zrcadlové klíčové snímky pro odlet Vítámvásu (výhra vlevo nahoru) */
+  @keyframes flyAwayLeft {
+    0% {
+      transform: translate(0, 0);
+    }
+    66% {
+      transform: translate(-250px, -200px);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-550px, -600px);
+      opacity: 0;
+    }
+  }
+
+  /* Lineární stín jedoucí doleva */
+  @keyframes shadowLeft {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-500px, 0); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  
+  <div id="inventory">
+    <img class="inv-item" src="groovie-icon.png" alt="Groovie" onclick="showItemText('groovie')">
+    <img class="inv-item" src="autoplay-icon.png" alt="Autoplay" onclick="showItemText('autoplay')">
+    <img class="inv-item" src="joint-icon.png" alt="Joint" onclick="showItemText('joint')">
+    <img class="inv-item" src="500-icon.png" alt="500" onclick="showItemText('500')">
+    <img class="inv-item" src="deska-icon.png" alt="Deska" onclick="showItemText('deska')">
+    <img class="inv-item" src="sponka-icon.png" alt="Sponka" onclick="showItemText('sponka')">
+    <img class="inv-item" src="sluchatka-icon.png" alt="Sluchátka" onclick="showItemText('sluchatka')">
+    <img class="inv-item" id="slivovice-icon" src="slivovice-icon.png" alt="Slivovice" onclick="showItemText('slivovice')">
+  </div>
+
+  <img id="slivovice-world" class="game-asset" src="slivovice.png" alt="Slivovice" onclick="pickupSlivovice()">
+  <img id="char-vitamvas" class="game-asset" src="Zhtlm_Vitamvas1.png" alt="Vítámvás">
+  <img id="char-kolimbus" class="game-asset" src="Zhtlm_Kolimbus1.png" alt="Kolimbus">
+
+  <div id="anim-error-container" class="animated-wrapper" style="left: 409px; top: 481px; z-index: 15;">
+    <img id="anim-kolimbus-body" src="Zhtlm_Kolimbus2.png" alt="Kolimbus létající" style="position: absolute;">
+  </div>
+  <div id="anim-error-shadow-container" class="animated-wrapper" style="left: 419px; top: 714px; z-index: 4;">
+    <img id="anim-kolimbus-shadow" src="Zhtlm_Kolimbus2-stin.png" alt="Stín Kolimbuse" style="position: absolute;">
+  </div>
+
+  <div id="anim-win-container" class="animated-wrapper" style="left: 151px; top: 451px; z-index: 15;">
+    <img id="anim-vitamvas-body" src="Zhtlm_Vitamvas2.png" alt="Vítámvás létající" style="position: absolute;">
+  </div>
+  <div id="anim-win-shadow-container" class="animated-wrapper" style="left: 153px; top: 714px; z-index: 4;">
+    <img id="anim-vitamvas-shadow" src="Zhtlm_Vitamvas2-stin.png" alt="Stín Vítámvásu" style="position: absolute;">
+  </div>
+
+  <img id="bubble-1" class="bubble" src="Zhtlm_text1.png" style="left: 197px; top: 329px;" onclick="nextStep()">
+  <img id="bubble-2" class="bubble" src="Zhtlm_text2.png" style="left: 249px; top: 332px;" onclick="nextStep()">
+  <img id="bubble-3" class="bubble" src="Zhtlm_text3.png" style="left: 183px; top: 320px;" onclick="nextStep()">
+  <img id="bubble-4" class="bubble" src="Zhtlm_text4.png" style="left: 289px; top: 320px;" onclick="nextStep()">
+  <img id="bubble-5" class="bubble" src="Zhtlm_text5.png" style="left: 199px; top: 332px;" onclick="nextStep()">
+  <img id="bubble-6" class="bubble" src="Zhtlm_text6.png" style="left: 281px; top: 299px;" onclick="nextStep()">
+  <img id="bubble-7" class="bubble" src="Zhtlm_text7.png" style="left: 201px; top: 280px;" onclick="nextStep()">
+  <img id="bubble-8" class="bubble" src="Zhtlm_text8.png" style="left: 300px; top: 341px;" onclick="nextStep()">
+  <img id="bubble-9" class="bubble" src="Zhtlm_text9.png" style="left: 180px; top: 285px;" onclick="startMiniGame()">
+
+  <img id="bubble-10" class="bubble" src="Zhtlm_text10.png" style="left: 88px; top: 340px; z-index: 20;" onclick="closeWinBubble()">
+
+  <button id="btn-final-continue" onclick="window.location.href='u-klece2-2.html'">Pokračovat</button>
+
+</div>
+
+<div id="modal-item-text" class="modal-overlay">
+  <div class="text-modal-content">
+    <p id="item-description-text">Text předmětu...</p>
+    <button onclick="closeItemModal()">Zavřít</button>
+  </div>
+</div>
+
+<div id="modal-minigame" class="modal-overlay">
+  <div id="quiz-card">
+    <div id="quiz-header">První otázka:</div>
+    <div id="quiz-question">Jak se jmenuješ?</div>
+    <div class="quiz-options">
+      <div class="quiz-option" id="opt-0" onclick="handleOptionClick(0)">Odpověď 1</div>
+      <div class="quiz-option" id="opt-1" onclick="handleOptionClick(1)">Odpověď 2</div>
+      <div class="quiz-option" id="opt-2" onclick="handleOptionClick(2)">Odpověď 3</div>
+    </div>
+  </div>
+</div>
+
+<audio id="audio-bgm" src="Intermission.mp3" loop></audio>
+<audio id="sfx-wrong" src="wrong.mp3"></audio>
+<audio id="sfx-wrong2" src="wrong2.mp3"></audio>
+<audio id="sfx-gulp" src="gulp.mp3"></audio>
+
+<script>
+  // ---- DATA PRO SCÉNU ----
+  let currentStep = 1;
+  let currentQuestionIndex = 0;
+  let isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  let mobileSelectedOption = null; // Pro dvou-dotykové potvrzení na mobilech
+  let slivoviceIsCollectible = false;
+
+  // Textové popisy předmětů pro modal
+  const itemTexts = {
+    '500': "Bonus za úspěšné hospodaření Lesů České republiky. Čuráci.",
+    'autoplay': "Tohle si schovám až na velké finále.",
+    'deska': "Už se těším, jak s touhle deskou Dávičovi natrhnu prdel.",
+    'groovie': "Ashe zatím povolat nepotřebuju.",
+    'joint': "Zhulím se až později, až všechno vyřídím.",
+    'sluchatka': "Čínská kopie sluchátek od Dr. Dre. Slušně izolují od okolí.",
+    'sponka': "Hm, ta ikonka mi něco připomíná.",
+    'slivovice': "Podle vůně je asi dost silná. Postavila by na nohy i mrtvého."
+  };
+
+  // Struktura otázek a logiky minihry
+  const quizData = [
+    {
+      header: "První otázka:",
+      question: "Jak se jmenuješ?",
+      options: ["Poručík Kolombo", "Kolimbus", "Kryštof Kolumbus"],
+      correct: 1 // Index 1 = Kolimbus
+    },
+    {
+      header: "Druhá otázka:",
+      question: "Jaký je tvůj quest?",
+      options: ["Získat zpět Plešbang", "Činit jen dobro", "Obětovat se pro lidstvo"],
+      correct: 0 // Index 0 = Získat zpět Plešbang
+    },
+    {
+      header: "Třetí otázka:",
+      question: "Jaké je hlavní město Barmy?",
+      options: ["Nepyjto", "Ragún", "Před nebo po roce 2005?"],
+      correct: 2 // Index 2 = Před nebo po roce 2005?
+    }
+  ];
+
+  // ---- HUDBA NA POZADÍ ----
+  document.addEventListener('click', function initBGM() {
+    const bgm = document.getElementById('audio-bgm');
+    if (bgm.paused) {
+      bgm.volume = 0.1; // Hlasitost 30% dle specifikace
+      bgm.play().catch(e => console.log("Audio čeká na plnou interakci."));
+    }
+    document.removeEventListener('click', initBGM);
+  });
+
+  // Pomocná funkce pro spuštění konkrétního audio handleru s hlasitostí
+  function playDedicatedSFX(elementId, volume) {
+    const sfx = document.getElementById(elementId);
+    if (sfx) {
+      sfx.currentTime = 0; // Reset na začátek, pokud by se kliklo rychle za sebou
+      sfx.volume = volume;
+      sfx.play().catch(e => console.log("Chyba přehrávání SFX:", e));
+    }
+  }
+
+  // ---- DIALOGOVÝ SYSTÉM ----
+  window.addEventListener('DOMContentLoaded', () => {
+    showBubble(1);
+    setupPCControls();
+  });
+
+  function showBubble(index) {
+    for (let i = 1; i <= 9; i++) {
+      document.getElementById(`bubble-${i}`).style.display = 'none';
+    }
+    document.getElementById(`bubble-${index}`).style.display = 'block';
+  }
+
+  function nextStep() {
+    currentStep++;
+    if (currentStep <= 9) {
+      showBubble(currentStep);
+    }
+  }
+
+  // ---- MODÁLNÍ OKNA INVENTÁŘE ----
+  function showItemText(key) {
+    document.getElementById('item-description-text').innerText = itemTexts[key];
+    document.getElementById('modal-item-text').style.display = 'flex';
+  }
+
+  function closeItemModal() {
+    document.getElementById('modal-item-text').style.display = 'none';
+  }
+
+  // ---- OVLÁDÁNÍ MINIHRY (PC / MOBIL) ----
+  function startMiniGame() {
+    document.getElementById('bubble-9').style.display = 'none';
+    currentQuestionIndex = 0;
+    mobileSelectedOption = null;
+    loadQuestion();
+    document.getElementById('modal-minigame').style.display = 'flex';
+  }
+
+  function loadQuestion() {
+    const data = quizData[currentQuestionIndex];
+    document.getElementById('quiz-header').innerText = data.header;
+    document.getElementById('quiz-question').innerText = data.question;
+    
+    mobileSelectedOption = null;
+    for (let i = 0; i < 3; i++) {
+      const optEl = document.getElementById(`opt-${i}`);
+      optEl.innerText = data.options[i];
+      optEl.classList.remove('highlighted');
+    }
+  }
+
+  function setupPCControls() {
+    if (!isMobile) {
+      for (let i = 0; i < 3; i++) {
+        const optEl = document.getElementById(`opt-${i}`);
+        optEl.addEventListener('mouseenter', () => {
+          optEl.classList.add('highlighted');
+        });
+        optEl.addEventListener('mouseleave', () => {
+          optEl.classList.remove('highlighted');
+        });
+      }
+    }
+  }
+
+  function handleOptionClick(index) {
+    if (isMobile) {
+      if (mobileSelectedOption !== index) {
+        for (let i = 0; i < 3; i++) {
+          document.getElementById(`opt-${i}`).classList.remove('highlighted');
+        }
+        mobileSelectedOption = index;
+        document.getElementById(`opt-${index}`).classList.add('highlighted');
+      } else {
+        verifyAnswer(index);
+      }
+    } else {
+      verifyAnswer(index);
+    }
+  }
+
+  function verifyAnswer(selectedIndex) {
+    const currentQuestion = quizData[currentQuestionIndex];
+    
+    if (selectedIndex === currentQuestion.correct) {
+      currentQuestionIndex++;
+      if (currentQuestionIndex < quizData.length) {
+        loadQuestion();
+      } else {
+        document.getElementById('modal-minigame').style.display = 'none';
+        triggerWinAnimation();
+      }
+    } else {
+      document.getElementById('modal-minigame').style.display = 'none';
+      triggerErrorAnimation();
+    }
+  }
+
+  // ---- ANIMACE: CHYBA (ODLET KOLIMBUSE) ----
+  function triggerErrorAnimation() {
+    // OPRAVENO: Správné skrytí původního statického Kolimbuse
+    const charKolimbus = document.getElementById('char-kolimbus');
+    charKolimbus.style.visibility = 'hidden';
+    charKolimbus.style.display = 'none';
+
+    const bodyWrapper = document.getElementById('anim-error-container');
+    const shadowWrapper = document.getElementById('anim-error-shadow-container');
+
+    // Reset předchozích CSS animací pro jistotu opakovaného spuštění
+    document.getElementById('anim-kolimbus-body').style.animation = 'none';
+    document.getElementById('anim-kolimbus-shadow').style.animation = 'none';
+    
+    // Vynucení překreslení prohlížečem (reflow), aby mohl reset animace proběhnout
+    bodyWrapper.offsetHeight; 
+
+    // Zviditelnění animovaných struktur
+    bodyWrapper.style.display = 'block';
+    shadowWrapper.style.display = 'block';
+
+    // Postava zůstane 1 sekundu staticky zobrazená na místě chybové grafiky
+    setTimeout(() => {
+      // Spuštění zvuku wrong.mp3 přes dedikovaný kanál (65% hlasitost)
+      playDedicatedSFX('sfx-wrong', 0.65);
+
+      // Aktivace CSS keyframes pro nelineární odlet
+      document.getElementById('anim-kolimbus-body').style.animation = 'flyAwayRight 1.8s forwards linear';
+      document.getElementById('anim-kolimbus-shadow').style.animation = 'shadowRight 1.8s forwards linear';
+
+      // Po dokončení odletu a doznění zvuku se scéna vrátí k bublině 9
+      setTimeout(() => {
+        bodyWrapper.style.display = 'none';
+        shadowWrapper.style.display = 'none';
+
+        // Obnovení původního stavu scény
+        charKolimbus.style.visibility = 'visible';
+        charKolimbus.style.display = 'block';
+
+        // Reset na bublinu č. 9
+        currentStep = 9;
+        showBubble(9);
+      }, 1800);
+
+    }, 1000);
+  }
+
+  // ---- ANIMACE: VÝHRA (ODLET VÍTÁMVÁSU) ----
+  function triggerWinAnimation() {
+    document.getElementById('char-vitamvas').style.visibility = 'hidden';
+    document.getElementById('char-vitamvas').style.display = 'none';
+
+    const bodyWrapper = document.getElementById('anim-win-container');
+    const shadowWrapper = document.getElementById('anim-win-shadow-container');
+
+    bodyWrapper.style.display = 'block';
+    shadowWrapper.style.display = 'block';
+
+    // Zobrazení vítězné textové bubliny 10
+    document.getElementById('bubble-10').style.display = 'block';
+  }
+
+  function closeWinBubble() {
+    document.getElementById('bubble-10').style.display = 'none';
+    
+    // Spuštění dedikovaného zvuku wrong2.mp3 (65% hlasitost)
+    playDedicatedSFX('sfx-wrong2', 0.65);
+
+    document.getElementById('anim-vitamvas-body').style.animation = 'flyAwayLeft 1.8s forwards linear';
+    document.getElementById('anim-vitamvas-shadow').style.animation = 'shadowLeft 1.8s forwards linear';
+
+    setTimeout(() => {
+      document.getElementById('anim-win-container').style.display = 'none';
+      document.getElementById('anim-win-shadow-container').style.display = 'none';
+      
+      // Slivovice na zemi se stává sebratelnou
+      slivoviceIsCollectible = true;
+    }, 1800);
+  }
+
+  // ---- SEBRÁNÍ PŘEDMĚTU A UKONČENÍ ----
+  function pickupSlivovice() {
+    if (slivoviceIsCollectible) {
+      document.getElementById('slivovice-world').style.display = 'none';
+      document.getElementById('slivovice-icon').style.display = 'block';
+      
+      // Spuštění dedikovaného zvuku gulp.mp3 (85% hlasitost)
+      playDedicatedSFX('sfx-gulp', 0.85);
+
+      document.getElementById('btn-final-continue').style.display = 'block';
+    }
+  }
+</script>
+
+</body>
+</html>
